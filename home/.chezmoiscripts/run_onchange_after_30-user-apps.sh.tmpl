@@ -1,0 +1,49 @@
+{{- $selected := includeTemplate "selected.json" . | fromJson -}}
+{{- $items := list -}}
+{{- range $name, $entry := $selected -}}
+{{-   if eq $entry.method "user_app" }}{{ $items = append $items $name }}{{ end -}}
+{{- end -}}
+{{- if and (eq .ignite.os "darwin") $items -}}
+#!/bin/bash
+# Without admin there is no Homebrew: download the apps that ship as a zip or
+# dmg straight into ~/Applications.
+set -uo pipefail
+{{ template "lib.sh" . }}
+ig_path_setup
+ig_reset user_app
+
+# ig_user_app <url> [cli path inside the .app, linked into ~/.local/bin]
+ig_user_app() {
+  set -eo pipefail
+  local url=$1 cli=${2:-} tmp app mounted=""
+  tmp=$(mktemp -d)
+  curl -fsSL -o "$tmp/download" "$url"
+  if unzip -tq "$tmp/download" >/dev/null 2>&1; then
+    unzip -q "$tmp/download" -d "$tmp/content"
+  else
+    mkdir -p "$tmp/content"
+    hdiutil attach -nobrowse -readonly -mountpoint "$tmp/content" "$tmp/download" >/dev/null
+    mounted=1
+  fi
+  app=$(find "$tmp/content" -maxdepth 1 -name '*.app' | head -n 1)
+  if [ -z "$app" ]; then
+    echo "no .app found in $url"
+    return 1
+  fi
+  mkdir -p "$HOME/Applications"
+  rm -rf "$HOME/Applications/$(basename "$app")"
+  cp -R "$app" "$HOME/Applications/"
+  if [ -n "$mounted" ]; then
+    hdiutil detach "$tmp/content" -quiet
+  fi
+  if [ -n "$cli" ]; then
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$HOME/Applications/$(basename "$app")/$cli" "$HOME/.local/bin/$(basename "$cli")"
+  fi
+  rm -rf "$tmp"
+}
+{{  range $name := $items }}
+{{-   $entry := get $selected $name }}
+ig_try user_app {{ $name }} ig_user_app {{ $entry.user_app | squote }}{{ with get $entry "user_app_bin" }} {{ . | squote }}{{ end }}
+{{- end }}
+{{ end -}}

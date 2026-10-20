@@ -1,0 +1,23 @@
+{{- $selected := includeTemplate "selected.json" . | fromJson -}}
+{{- $items := list -}}
+{{- range $name, $entry := $selected -}}
+{{-   if or (eq $entry.method "brew") (eq $entry.method "cask") }}{{ $items = append $items $name }}{{ end -}}
+{{- end -}}
+{{- if and (eq .ignite.os "darwin") $items -}}
+#!/bin/bash
+# Homebrew formulae and casks from the ignite catalog. Needs admin, so it runs
+# before the per-user installs.
+set -uo pipefail
+{{ template "lib.sh" . }}
+ig_path_setup
+ig_reset brew
+export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1 HOMEBREW_NO_INSTALL_CLEANUP=1
+{{  range $name := $items }}
+{{-   $entry := get $selected $name }}
+{{-   if eq $entry.method "cask" }}
+ig_try brew {{ $name }} brew install --cask {{ $entry.cask }}
+{{-   else }}
+ig_try brew {{ $name }} brew install --formula {{ $entry.brew }}
+{{-   end }}
+{{- end }}
+{{ end -}}

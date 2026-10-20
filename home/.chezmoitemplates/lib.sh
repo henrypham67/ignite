@@ -67,10 +67,22 @@ ig_try() {
   return 0
 }
 
+# ig_sudo <cmd...>: run as root; plain when already root (containers).
+ig_sudo() {
+  if [ "$(id -u)" = 0 ]; then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
 # ig_path_setup: make freshly installed tools visible to the rest of the script.
+# IG_BREW_SEARCH overrides where to look for Homebrew; tests set it empty so a
+# rendered script can never reach the real brew on the machine running them.
 ig_path_setup() {
-  local brew
-  for brew in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+  local brew candidates
+  read -r -a candidates <<< "${IG_BREW_SEARCH-/opt/homebrew/bin/brew /usr/local/bin/brew}"
+  for brew in ${candidates[@]+"${candidates[@]}"}; do
     if [ -x "$brew" ]; then
       eval "$("$brew" shellenv)"
       break

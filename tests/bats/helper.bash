@@ -8,12 +8,14 @@ FIXTURES="$REPO/tests/fixtures"
 SRC="$REPO"
 
 # Run chezmoi against $SRC with a fixture machine config, isolated from the
-# real home directory and the real chezmoi state.
+# real home directory and the real chezmoi state. The fixture is a name under
+# tests/fixtures/config, or a path to a config file.
 _chezmoi() {
-  local fixture=$1
+  local config="$FIXTURES/config/$1.toml"
+  [ -f "$1" ] && config=$1
   shift
   chezmoi --source "$SRC" \
-    --config "$FIXTURES/config/$fixture.toml" \
+    --config "$config" \
     --persistent-state "$BATS_TEST_TMPDIR/state.boltdb" \
     --destination "$BATS_TEST_TMPDIR/home" \
     "$@"

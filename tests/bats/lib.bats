@@ -85,12 +85,38 @@ rows() {
   [ "$(awk -F '\t' '{ print NF }' "$REPORT")" -eq 4 ]
 }
 
+@test "lib.sh: ig_path_setup with IG_BREW_SEARCH empty never runs a real brew" {
+  stubs="$BATS_TEST_TMPDIR/stubs"
+  mkdir -p "$stubs"
+  printf '#!/bin/sh\necho brew-was-called >&2\nexit 1\n' > "$stubs/brew"
+  chmod +x "$stubs/brew"
+  path=$(env HOME="$BATS_TEST_TMPDIR/h" IG_BREW_SEARCH="" PATH="$stubs:/usr/bin:/bin" \
+    bash -c ". '$LIB'; ig_path_setup; printf '%s' \"\$PATH\"" 2>&1)
+  [[ "$path" != *brew-was-called* ]]
+  [[ ":$path:" != *":/opt/homebrew/bin:"* ]]
+  # The stub dir stays ahead of anything ig_path_setup adds from the system.
+  [[ "$path" == *"$stubs:/usr/bin:/bin" ]]
+}
+
 @test "lib.sh: ig_path_setup puts ~/.local/bin and mise shims on PATH" {
-  path=$(env -u XDG_DATA_HOME -u KREW_ROOT HOME="$BATS_TEST_TMPDIR/h" \
+  path=$(env -u XDG_DATA_HOME -u KREW_ROOT HOME="$BATS_TEST_TMPDIR/h" IG_BREW_SEARCH="" \
     bash -c ". '$LIB'; ig_path_setup; printf '%s' \"\$PATH\"")
   [[ ":$path:" == *":$BATS_TEST_TMPDIR/h/.local/bin:"* ]]
   [[ ":$path:" == *":$BATS_TEST_TMPDIR/h/.local/share/mise/shims:"* ]]
   [[ ":$path:" == *":$BATS_TEST_TMPDIR/h/.krew/bin:"* ]]
+}
+
+@test "lib.sh: ig_sudo runs through sudo, or directly as root" {
+  stubs="$BATS_TEST_TMPDIR/stubs"
+  mkdir -p "$stubs"
+  printf '#!/bin/sh\necho "sudo $*"\n' > "$stubs/sudo"
+  printf '#!/bin/sh\necho 1000\n' > "$stubs/id"
+  chmod +x "$stubs/sudo" "$stubs/id"
+  run env PATH="$stubs:$PATH" bash -c ". '$LIB'; ig_sudo echo hi"
+  [ "$output" = "sudo echo hi" ]
+  printf '#!/bin/sh\necho 0\n' > "$stubs/id"
+  run env PATH="$stubs:$PATH" bash -c ". '$LIB'; ig_sudo echo hi"
+  [ "$output" = "hi" ]
 }
 
 @test "needs-it: script records needs_it entries for darwin-noadmin" {

@@ -1,0 +1,8 @@
+# Managed by ignite (chezmoi): edit home/.chezmoidata/packages.yaml, not this file.
+{{- $selected := includeTemplate "selected.json" . | fromJson }}
+[tools]
+{{- range $name, $entry := $selected }}
+{{-   if eq $entry.method "mise" }}
+{{ $entry.mise | quote }} = {{ get $entry "version" | default "latest" | toString | quote }}
+{{-   end }}
+{{- end }}

@@ -143,6 +143,7 @@ packages:
     platforms: [darwin, windows, linux]
     cask: visual-studio-code
     user_app: https://update.code.visualstudio.com/latest/darwin-universal/stable
+    user_app_bin: Contents/Resources/app/bin/code
     winget: Microsoft.VisualStudioCode
     winget_user: true
     scoop: extras/vscode

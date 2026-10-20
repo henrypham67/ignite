@@ -1,0 +1,27 @@
+{{- $selected := includeTemplate "selected.json" . | fromJson -}}
+{{- /* Runtimes first (other tools are built on them), language-package backends last. */ -}}
+{{- $first := list -}}
+{{- range $name := list "node" "python" "go" "uv" -}}
+{{-   if and (hasKey $selected $name) (eq (get $selected $name).method "mise") }}{{ $first = append $first $name }}{{ end -}}
+{{- end -}}
+{{- $middle := list -}}
+{{- $last := list -}}
+{{- range $name, $entry := $selected -}}
+{{-   if and (eq $entry.method "mise") (not (has $name $first)) -}}
+{{-     if regexMatch "^(npm|pipx|pypi):" $entry.mise }}{{ $last = append $last $name }}{{ else }}{{ $middle = append $middle $name }}{{ end -}}
+{{-   end -}}
+{{- end -}}
+{{- $items := concat $first $middle $last -}}
+{{- if and (ne .ignite.os "windows") $items -}}
+#!/bin/bash
+# Versioned CLIs and runtimes from the ignite catalog, installed per user by mise.
+set -uo pipefail
+{{ template "lib.sh" . }}
+ig_path_setup
+ig_reset mise
+export MISE_YES=1
+{{- range $name := $items }}
+{{-   $entry := get $selected $name }}
+ig_try mise {{ $name }} mise install {{ $entry.mise }}@{{ get $entry "version" | default "latest" | toString }}
+{{- end }}
+{{ end -}}

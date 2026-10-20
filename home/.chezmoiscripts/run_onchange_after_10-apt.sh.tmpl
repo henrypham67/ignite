@@ -1,0 +1,18 @@
+{{- $selected := includeTemplate "selected.json" . | fromJson -}}
+{{- $items := list -}}
+{{- range $name, $entry := $selected -}}
+{{-   if eq $entry.method "apt" }}{{ $items = append $items $name }}{{ end -}}
+{{- end -}}
+{{- if and (or (eq .ignite.os "linux") (eq .ignite.os "wsl")) $items -}}
+#!/bin/bash
+# apt packages from the ignite catalog. Needs admin, so it runs before the
+# per-user installs.
+set -uo pipefail
+{{ template "lib.sh" . }}
+ig_path_setup
+ig_reset apt
+ig_try apt apt-update ig_sudo apt-get update -y
+{{- range $name := $items }}
+ig_try apt {{ $name }} ig_sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y {{ (get $selected $name).apt }}
+{{- end }}
+{{ end -}}
