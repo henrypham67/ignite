@@ -1,0 +1,13 @@
+packages:
+  a:
+    job: tool
+    group: core
+    mise: aqua:example/a
+  b:
+    job: tool
+    group: core
+    mise: aqua:example/b
+  c:
+    job: other
+    group: everything
+    mise: aqua:example/c

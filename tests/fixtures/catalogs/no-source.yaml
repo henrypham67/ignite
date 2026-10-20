@@ -1,0 +1,6 @@
+packages:
+  maconly:
+    job: thing
+    group: core
+    platforms: [windows]
+    brew: maconly

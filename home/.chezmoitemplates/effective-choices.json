@@ -1,0 +1,55 @@
+{{- /*
+  The tool chosen for each option job on this machine, as a JSON object
+  job -> option. Values set in the machine config ([data.ignite.choices])
+  override choice_defaults; a default may be a map os -> option, where wsl
+  falls back to linux. container_engine is computed from the OS and whether
+  the company licenses Docker Desktop.
+*/ -}}
+{{- $os := .ignite.os -}}
+{{- $set := dict -}}
+{{- if hasKey .ignite "choices" }}{{ $set = .ignite.choices }}{{ end -}}
+
+{{- $options := dict -}}
+{{- range $name, $p := .packages -}}
+{{-   if hasKey $p "option" -}}
+{{-     $job := toString $p.job -}}
+{{-     $current := list -}}
+{{-     if hasKey $options $job }}{{ $current = get $options $job }}{{ end -}}
+{{-     $_ := set $options $job (append $current (toString $p.option)) -}}
+{{-   end -}}
+{{- end -}}
+
+{{- $out := dict -}}
+{{- range $job, $default := .choice_defaults -}}
+{{-   $value := $default -}}
+{{-   if kindIs "map" $default -}}
+{{-     $value = "none" -}}
+{{-     if hasKey $default $os -}}
+{{-       $value = get $default $os -}}
+{{-     else if and (eq $os "wsl") (hasKey $default "linux") -}}
+{{-       $value = get $default "linux" -}}
+{{-     end -}}
+{{-   end -}}
+{{-   if hasKey $set $job }}{{ $value = get $set $job }}{{ end -}}
+{{-   $_ := set $out $job (toString $value) -}}
+{{- end -}}
+
+{{- range $job, $value := $set -}}
+{{-   $valid := list -}}
+{{-   if hasKey $options $job }}{{ $valid = get $options $job }}{{ end -}}
+{{-   $valid = append $valid "none" -}}
+{{-   if not (has (toString $value) $valid) -}}
+{{-     fail (printf "unknown option %q for %s; valid: %s" (toString $value) $job (join ", " $valid)) -}}
+{{-   end -}}
+{{- end -}}
+
+{{- $engine := "none" -}}
+{{- if eq $os "darwin" -}}
+{{-   $engine = ternary "docker-desktop" "colima" .ignite.docker_licensed -}}
+{{- else if eq $os "windows" -}}
+{{-   $engine = ternary "docker-desktop" "rancher-desktop" .ignite.docker_licensed -}}
+{{- else if eq $os "linux" -}}
+{{-   $engine = "docker-engine" -}}
+{{- end -}}
+{{- $_ := set $out "container_engine" $engine -}}
+{{ $out | toJson }}

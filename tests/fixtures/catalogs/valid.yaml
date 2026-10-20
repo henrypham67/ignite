@@ -1,7 +1,9 @@
 packages:
+  # --- option jobs (choice_defaults in choices.yaml) ---
   vscode:
     job: editor
     option: vscode
+    platforms: [darwin, windows, linux]
     cask: visual-studio-code
     user_app: https://example.com/vscode.zip
     winget: Microsoft.VisualStudioCode
@@ -37,3 +39,82 @@ packages:
     platforms: [windows]
     winget: Microsoft.WindowsTerminal
     bin: wt
+
+  # --- container_engine (computed choice) ---
+  docker-desktop:
+    job: container_engine
+    option: docker-desktop
+    platforms: [darwin, windows]
+    cask: docker-desktop
+    winget: Docker.DockerDesktop
+    admin_only: true
+  colima:
+    job: container_engine
+    option: colima
+    platforms: [darwin]
+    brew: colima
+  rancher-desktop:
+    job: container_engine
+    option: rancher-desktop
+    platforms: [windows]
+    winget: SUSE.RancherDesktop
+    admin_only: true
+  docker-engine:
+    job: container_engine
+    option: docker-engine
+    platforms: [linux]
+    script: true
+    admin_only: true
+
+  # --- group jobs ---
+  kubectl:
+    job: kubernetes_cli
+    group: core
+    mise: aqua:kubernetes/kubectl
+    brew: kubernetes-cli
+  homebrew:
+    job: darwin_pkg_manager
+    group: core
+    platforms: [darwin]
+    bootstrap: true
+    admin_only: true
+    bin: brew
+  rectangle:
+    job: window_snapping
+    group: core
+    platforms: [darwin]
+    cask: rectangle
+  sevenzip:
+    job: archiver
+    group: core
+    platforms: [windows]
+    winget: 7zip.7zip
+    scoop: main/7zip
+  tree:
+    job: tree_view
+    group: core
+    platforms: [darwin, linux, wsl]
+    brew: tree
+    apt: tree
+  glab:
+    job: gitlab_cli
+    group: gitlab
+    mise: gitlab:gitlab-org/cli
+  awscli:
+    job: aws_cli
+    group: cloud-aws
+    mise: aws-cli
+  cilium-cli:
+    job: cilium_cli
+    group: specialist
+    mise: aqua:cilium/cilium-cli
+    bin: cilium
+  krew-ctx:
+    job: kube_context_switch
+    group: core
+    krew: ctx
+  hashicorp.terraform:
+    job: terraform_lang
+    group: core
+    vscode_ext: hashicorp.terraform
+    requires: vscode

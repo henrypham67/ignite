@@ -14,6 +14,10 @@ run = "bats --recursive tests/bats"
 description = "Run the Pester test suite"
 run = "pwsh -NoLogo -NoProfile -Command 'Invoke-Pester -Path tests/pester -CI'"
 
+[tasks.validate]
+description = "Resolve the package catalog for every fixture machine"
+run = "scripts/validate-catalog.sh"
+
 [tasks.lint]
 description = "shellcheck the shell scripts; PSScriptAnalyzer the PowerShell scripts"
 run = [
