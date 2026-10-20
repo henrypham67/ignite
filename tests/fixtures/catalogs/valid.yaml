@@ -1,0 +1,39 @@
+packages:
+  vscode:
+    job: editor
+    option: vscode
+    cask: visual-studio-code
+    user_app: https://example.com/vscode.zip
+    winget: Microsoft.VisualStudioCode
+    winget_user: true
+    scoop: extras/vscode
+    script: true
+    bin: code
+  zed:
+    job: editor
+    option: zed
+    platforms: [darwin, windows, linux]
+    cask: zed
+    winget: ZedIndustries.Zed
+    script: true
+  starship:
+    job: prompt
+    option: starship
+    mise: aqua:starship/starship
+  powerlevel10k:
+    job: prompt
+    option: powerlevel10k
+    platforms: [darwin, linux, wsl]
+    archive: {url: "https://example.com/p10k.tar.gz", dest: .oh-my-zsh/custom/themes/powerlevel10k}
+  ghostty:
+    job: terminal
+    option: ghostty
+    platforms: [darwin, linux]
+    cask: ghostty
+    script: true
+  windows-terminal:
+    job: terminal
+    option: windows-terminal
+    platforms: [windows]
+    winget: Microsoft.WindowsTerminal
+    bin: wt

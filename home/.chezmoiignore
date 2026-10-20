@@ -1,0 +1,20 @@
+{{- /*
+  Targets each OS does not get. Paths are relative to the home directory.
+  Tasks add lines here as they add OS-specific files.
+*/ -}}
+
+{{- if eq .ignite.os "windows" }}
+# --- not on Windows ---
+{{- end }}
+
+{{- if ne .ignite.os "windows" }}
+# --- Windows only ---
+{{- end }}
+
+{{- if ne .ignite.os "darwin" }}
+# --- macOS only ---
+{{- end }}
+
+{{- if eq .ignite.os "wsl" }}
+# --- not inside WSL (handled on the Windows side) ---
+{{- end }}

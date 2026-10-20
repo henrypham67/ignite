@@ -1,0 +1,19 @@
+[data.ignite]
+os = "darwin"
+admin = true
+email = "ci@example.com"
+git_host = "github"
+gitlab_url = ""
+cloud_aws = true
+cloud_azure = false
+cloud_gcp = false
+docker_licensed = true
+group_specialist = true
+group_personal = false
+customize_choices = true
+ca_cert = ""
+ca_bundle = ""
+
+[data.ignite.choices]
+editor = "zed"
+prompt = "powerlevel10k"

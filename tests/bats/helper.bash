@@ -29,6 +29,18 @@ render_tpl() {
   printf '%s' "$2" | _chezmoi "$1" execute-template
 }
 
+# render_init <template> [execute-template flags...]: render a config file
+# template the way `chezmoi init` would, with no existing config. Prompts are
+# answered with --promptString/--promptBool/--promptChoice "<prompt>=<value>".
+render_init() {
+  local template=$1
+  shift
+  chezmoi --source "$SRC" \
+    --config "$BATS_TEST_TMPDIR/no-config.toml" \
+    --persistent-state "$BATS_TEST_TMPDIR/state.boltdb" \
+    execute-template --init --no-tty "$@" < "$template"
+}
+
 # managed <fixture>: list the targets chezmoi manages for a fixture machine.
 managed() {
   _chezmoi "$1" managed --path-style relative
@@ -42,7 +54,9 @@ with_catalog() {
   local src="$BATS_TEST_TMPDIR/src"
   mkdir -p "$src/home/.chezmoidata"
   printf 'home\n' > "$src/.chezmoiroot"
-  ln -s "$REPO/home/.chezmoitemplates" "$src/home/.chezmoitemplates"
+  if [ -d "$REPO/home/.chezmoitemplates" ]; then
+    ln -s "$REPO/home/.chezmoitemplates" "$src/home/.chezmoitemplates"
+  fi
   cp "$catalog" "$src/home/.chezmoidata/packages.yaml"
   cp "$choices" "$src/home/.chezmoidata/choices.yaml"
   SRC="$src"

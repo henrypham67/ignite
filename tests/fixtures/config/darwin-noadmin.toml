@@ -1,0 +1,17 @@
+[data.ignite]
+os = "darwin"
+admin = false
+email = "ci@example.com"
+git_host = "github"
+gitlab_url = ""
+cloud_aws = true
+cloud_azure = false
+cloud_gcp = false
+docker_licensed = false
+group_specialist = false
+group_personal = false
+customize_choices = false
+ca_cert = ""
+ca_bundle = ""
+
+[data.ignite.choices]
