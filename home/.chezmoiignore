@@ -14,6 +14,10 @@
 
 {{- if ne .ignite.os "windows" }}
 # --- Windows only ---
+AppData
+AppData/**
+.config/powershell
+.config/powershell/**
 {{- end }}
 
 {{- if ne .ignite.os "darwin" }}

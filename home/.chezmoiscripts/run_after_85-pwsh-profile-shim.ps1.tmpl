@@ -1,0 +1,5 @@
+{{- if eq .ignite.os "windows" -}}
+# Runs on every apply; does nothing once the shim line is in $PROFILE.
+{{ template "pwsh-profile-shim.ps1" . }}
+Install-IgniteProfileShim -ProfilePath $PROFILE.CurrentUserAllHosts
+{{ end -}}

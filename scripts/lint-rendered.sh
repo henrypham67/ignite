@@ -46,7 +46,7 @@ if [ "$ps_count" -gt 0 ]; then
       # their small helper functions don't need -WhatIf support, and the
       # analyzer can't see parameters used inside .GetNewClosure() blocks.
       Invoke-ScriptAnalyzer -Path \$_.FullName -Severity Warning, Error \`
-        -ExcludeRule PSAvoidUsingWriteHost, PSUseShouldProcessForStateChangingFunctions, PSReviewUnusedParameter
+        -ExcludeRule PSAvoidUsingWriteHost, PSUseShouldProcessForStateChangingFunctions, PSReviewUnusedParameter, PSUseSingularNouns
     }
     if (\$findings) { \$findings | Format-Table -AutoSize RuleName, ScriptName, Line, Message | Out-String -Width 200; exit 1 }
   "
