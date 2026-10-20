@@ -1,0 +1,21 @@
+{{- $selected := includeTemplate "selected.json" . | fromJson -}}
+{{- $items := list -}}
+{{- range $name, $entry := $selected -}}
+{{-   if eq $entry.method "krew" }}{{ $items = append $items $name }}{{ end -}}
+{{- end -}}
+{{- if and (eq .ignite.os "windows") $items -}}
+# kubectl plugins from the ignite catalog, installed with krew.
+{{ template "lib.ps1" . }}
+Update-IgnitePath
+Reset-IgniteReport -Source krew
+
+function Install-IgniteKrew {
+    param([string]$Name, [string]$Plugin)
+    Invoke-IgniteTry -Source krew -Item $Name -ScriptBlock { kubectl krew install $Plugin }.GetNewClosure()
+}
+
+Invoke-IgniteTry -Source krew -Item krew-index -ScriptBlock { kubectl krew update }
+{{- range $name := $items }}
+Install-IgniteKrew -Name '{{ $name }}' -Plugin '{{ (get $selected $name).krew }}'
+{{- end }}
+{{ end -}}

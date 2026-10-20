@@ -1,17 +1,5 @@
 {{- $selected := includeTemplate "selected.json" . | fromJson -}}
-{{- /* Runtimes first (other tools are built on them), language-package backends last. */ -}}
-{{- $first := list -}}
-{{- range $name := list "node" "python" "go" "uv" -}}
-{{-   if and (hasKey $selected $name) (eq (get $selected $name).method "mise") }}{{ $first = append $first $name }}{{ end -}}
-{{- end -}}
-{{- $middle := list -}}
-{{- $last := list -}}
-{{- range $name, $entry := $selected -}}
-{{-   if and (eq $entry.method "mise") (not (has $name $first)) -}}
-{{-     if regexMatch "^(npm|pipx|pypi):" $entry.mise }}{{ $last = append $last $name }}{{ else }}{{ $middle = append $middle $name }}{{ end -}}
-{{-   end -}}
-{{- end -}}
-{{- $items := concat $first $middle $last -}}
+{{- $items := includeTemplate "mise-order.json" . | fromJson -}}
 {{- if and (ne .ignite.os "windows") $items -}}
 #!/bin/bash
 # Versioned CLIs and runtimes from the ignite catalog, installed per user by mise.

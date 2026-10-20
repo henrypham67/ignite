@@ -199,7 +199,18 @@ fixture_with_choice() {
 }
 
 @test "install: every script entry has its install templates" {
-  skip "the .ps1 install templates arrive in Task 9"
+  catalog=$(chezmoi --source "$REPO" --config "$FIXTURES/config/darwin-admin.toml" \
+    --persistent-state "$BATS_TEST_TMPDIR/state.boltdb" execute-template '{{ .packages | toJson }}')
+  missing=$(jq -r '
+    to_entries[]
+    | select(.value.script != null and .value.script != false)
+    | .key as $name
+    | (if (.value.script | type) == "array" then .value.script else (.value.platforms // ["darwin","windows","linux","wsl"]) end) as $where
+    | select($where | index("windows"))
+    | $name' <<< "$catalog" | while read -r name; do
+      [ -f "$REPO/home/.chezmoitemplates/install/$name.ps1" ] || echo "$name"
+    done)
+  [ -z "$missing" ] || { echo "missing .ps1: $missing"; false; }
 }
 
 @test "install: every unix script entry has its .sh install template" {

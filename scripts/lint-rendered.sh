@@ -43,9 +43,10 @@ if [ "$ps_count" -gt 0 ]; then
     Import-Module PSScriptAnalyzer
     \$findings = Get-ChildItem -Recurse -Filter '*.ps1' -Path '$out' | ForEach-Object {
       # Rendered scripts are run once by chezmoi: console output is the point,
-      # and their small helper functions don't need -WhatIf support.
+      # their small helper functions don't need -WhatIf support, and the
+      # analyzer can't see parameters used inside .GetNewClosure() blocks.
       Invoke-ScriptAnalyzer -Path \$_.FullName -Severity Warning, Error \`
-        -ExcludeRule PSAvoidUsingWriteHost, PSUseShouldProcessForStateChangingFunctions
+        -ExcludeRule PSAvoidUsingWriteHost, PSUseShouldProcessForStateChangingFunctions, PSReviewUnusedParameter
     }
     if (\$findings) { \$findings | Format-Table -AutoSize RuleName, ScriptName, Line, Message | Out-String -Width 200; exit 1 }
   "

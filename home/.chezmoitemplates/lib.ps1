@@ -83,14 +83,20 @@ function Invoke-IgniteTry {
 }
 
 # Make freshly installed tools visible to the rest of the script: reload PATH
-# from the registry, then add the per-user tool dirs.
+# from the registry (Windows only; elsewhere keep the current PATH), then put
+# the per-user tool dirs first.
 function Update-IgnitePath {
+    $rest = @($env:Path)
+    if ($IsWindows) {
+        $rest = @(
+            [Environment]::GetEnvironmentVariable('Path', 'Machine'),
+            [Environment]::GetEnvironmentVariable('Path', 'User')
+        )
+    }
     $parts = @(
         (Join-Path $HOME '.local/bin'),
         (Join-Path $env:LOCALAPPDATA 'mise/shims'),
-        (Join-Path $HOME '.krew/bin'),
-        [Environment]::GetEnvironmentVariable('Path', 'Machine'),
-        [Environment]::GetEnvironmentVariable('Path', 'User')
-    ) | Where-Object { $_ }
+        (Join-Path $HOME '.krew/bin')
+    ) + $rest | Where-Object { $_ }
     $env:Path = $parts -join [IO.Path]::PathSeparator
 }

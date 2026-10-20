@@ -1,0 +1,34 @@
+{{- $selected := includeTemplate "selected.json" . | fromJson -}}
+{{- $items := list -}}
+{{- range $name, $entry := $selected -}}
+{{-   if eq $entry.method "vscode_ext" }}{{ $items = append $items $entry.vscode_ext }}{{ end -}}
+{{- end -}}
+{{- if and (eq .ignite.os "windows") $items -}}
+# VS Code extensions from the ignite catalog.
+{{ template "lib.ps1" . }}
+Update-IgnitePath
+Reset-IgniteReport -Source vscode-ext
+
+$extensions = @(
+{{- range $id := $items }}
+    '{{ $id }}'
+{{- end }}
+)
+
+$code = Get-Command code.cmd, code -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
+if (-not $code) {
+    $candidates = @(
+        (Join-Path $env:LOCALAPPDATA 'Programs\Microsoft VS Code\bin\code.cmd'),
+        (Join-Path $env:ProgramFiles 'Microsoft VS Code\bin\code.cmd')
+    )
+    $code = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+}
+
+foreach ($extension in $extensions) {
+    if (-not $code) {
+        Add-IgniteReport -Source vscode-ext -Status failed -Item $extension -Detail 'VS Code CLI not found'
+        continue
+    }
+    Invoke-IgniteTry -Source vscode-ext -Item $extension -ScriptBlock { & $code --install-extension $extension }.GetNewClosure()
+}
+{{ end -}}

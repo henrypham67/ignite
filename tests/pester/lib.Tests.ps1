@@ -56,6 +56,18 @@ Describe 'lib.ps1' {
         Get-Content -LiteralPath $Report | Should -Match 'rate limit exceeded.*set GITHUB_TOKEN and retry$'
     }
 
+    It 'Update-IgnitePath puts the per-user tool dirs first and keeps the rest' {
+        $saved = $env:Path
+        try {
+            if (-not $IsWindows) { $env:Path = '/stubs' + [IO.Path]::PathSeparator + '/usr/bin' }
+            Update-IgnitePath
+            $parts = $env:Path -split [IO.Path]::PathSeparator
+            $parts[0] | Should -Be (Join-Path $HOME '.local/bin')
+            if (-not $IsWindows) { $parts | Should -Contain '/stubs' }
+        }
+        finally { $env:Path = $saved }
+    }
+
     It 'detail strips tabs and newlines' {
         Add-IgniteReport -Source scoop -Status failed -Item git -Detail "a`tb`nc"
         $lines = @(Get-Content -LiteralPath $Report)
