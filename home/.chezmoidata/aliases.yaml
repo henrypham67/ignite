@@ -1,0 +1,20 @@
+# Short commands shared by zsh, bash and PowerShell. `omz: <plugin>` marks an
+# alias that oh-my-zsh plugin already defines (with the same meaning), so the
+# zsh config doesn't define it again.
+aliases:
+  k: {cmd: kubectl, omz: kubectl}
+  kgp: {cmd: kubectl get pods, omz: kubectl}
+  kgs: {cmd: kubectl get svc, omz: kubectl}
+  kgd: {cmd: kubectl get deployment, omz: kubectl}
+  kdp: {cmd: kubectl describe pods, omz: kubectl}
+  kl: {cmd: kubectl logs, omz: kubectl}
+  kaf: {cmd: kubectl apply -f, omz: kubectl}
+  kctx: {cmd: kubectl ctx}
+  kns: {cmd: kubectl ns}
+  tf: {cmd: terraform, omz: terraform}
+  g: {cmd: git, omz: git}
+  gst: {cmd: git status, omz: git}
+  gco: {cmd: git checkout, omz: git}
+  gcm: {cmd: git checkout main, omz: git}
+  gp: {cmd: git push, omz: git}
+  gl: {cmd: git pull, omz: git}

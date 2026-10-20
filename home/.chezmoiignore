@@ -5,6 +5,11 @@
 
 {{- if eq .ignite.os "windows" }}
 # --- not on Windows ---
+.zshrc
+.zprofile
+.bashrc
+.oh-my-zsh
+.oh-my-zsh/**
 {{- end }}
 
 {{- if ne .ignite.os "windows" }}

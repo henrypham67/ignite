@@ -1,0 +1,39 @@
+{{- $selected := includeTemplate "selected.json" . | fromJson -}}
+{{- $choices := includeTemplate "effective-choices.json" . | fromJson -}}
+# ~/.bashrc, managed by ignite (chezmoi). zsh is the main shell; this keeps bash
+# usable (and is the whole setup on a Linux box without zsh).
+case $- in
+  *i*) ;;
+  *) return ;;
+esac
+
+HISTSIZE=50000
+HISTFILESIZE=50000
+HISTCONTROL=ignoreboth:erasedups
+shopt -s histappend checkwinsize
+
+export PATH="$HOME/.local/bin:${XDG_DATA_HOME:-$HOME/.local/share}/mise/shims:${KREW_ROOT:-$HOME/.krew}/bin:$HOME/go/bin:$PATH"
+{{- $editor := "vi" }}
+{{- if eq (get $choices "terminal_editor") "neovim" }}{{ $editor = "nvim" }}
+{{- else if eq (get $choices "terminal_editor") "vim" }}{{ $editor = "vim" }}{{ end }}
+export EDITOR={{ $editor | squote }}
+
+command -v mise >/dev/null && eval "$(mise activate bash)"
+command -v direnv >/dev/null && eval "$(direnv hook bash)"
+command -v zoxide >/dev/null && eval "$(zoxide init bash)"
+{{- if hasKey $selected "nvm" }}
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+{{- end }}
+
+{{ includeTemplate "shell-env.sh" . }}
+{{ range $alias, $def := .aliases }}
+alias {{ $alias }}={{ $def.cmd | squote }}
+{{- end }}
+
+[ -f ~/.bashrc.local ] && . ~/.bashrc.local
+{{- if hasKey $selected "starship" }}
+
+command -v starship >/dev/null && eval "$(starship init bash)"
+{{- end }}

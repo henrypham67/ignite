@@ -1,0 +1,10 @@
+# ~/.zprofile, managed by ignite (chezmoi). Login shells, including the
+# non-interactive ones IDEs start, get Homebrew and the mise shims.
+for brew in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+  if [ -x "$brew" ]; then
+    eval "$("$brew" shellenv)"
+    break
+  fi
+done
+unset brew
+export PATH="$HOME/.local/bin:${XDG_DATA_HOME:-$HOME/.local/share}/mise/shims:$PATH"

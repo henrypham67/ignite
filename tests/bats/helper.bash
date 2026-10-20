@@ -17,6 +17,7 @@ _chezmoi() {
   chezmoi --source "$SRC" \
     --config "$config" \
     --persistent-state "$BATS_TEST_TMPDIR/state.boltdb" \
+    --cache "$BATS_TEST_TMPDIR/chezmoi-cache" \
     --destination "$BATS_TEST_TMPDIR/home" \
     "$@"
 }
@@ -44,8 +45,17 @@ render_init() {
 }
 
 # managed <fixture>: list the targets chezmoi manages for a fixture machine.
+# Runs on a copy of the source without .chezmoiexternal.toml.tmpl: chezmoi
+# would otherwise download every external archive just to list targets.
 managed() {
-  _chezmoi "$1" managed --path-style relative
+  local copy="$BATS_TEST_TMPDIR/managed-src"
+  if [ ! -d "$copy" ]; then
+    mkdir -p "$copy"
+    cp "$SRC/.chezmoiroot" "$copy/"
+    cp -R "$SRC/home" "$copy/home"
+    rm -f "$copy/home/.chezmoiexternal.toml.tmpl"
+  fi
+  SRC="$copy" _chezmoi "$1" managed --path-style relative
 }
 
 # with_catalog <catalog.yaml> [choices.yaml]: point $SRC at a temporary source
