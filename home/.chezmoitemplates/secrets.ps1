@@ -20,6 +20,10 @@ function Sync-IgniteSecretsFile {
         Set-Acl -LiteralPath $Path -AclObject $acl
     }
     $existing = Get-Content -Raw -LiteralPath $Path
+    # A last line without a newline would swallow the first name appended.
+    if ($existing -and -not $existing.EndsWith("`n")) {
+        [IO.File]::AppendAllText($Path, [Environment]::NewLine)
+    }
     foreach ($name in $Names) {
         if ($existing -notmatch "(?m)^\s*\`$env:$name\s*=") {
             Add-Content -LiteralPath $Path -Value "`$env:$name = ''" -Encoding utf8NoBOM

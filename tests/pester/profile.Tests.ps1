@@ -25,6 +25,16 @@ Describe 'PowerShell profile and Windows Terminal' {
             @($lines | Where-Object { $_ -like '*.config*powershell*profile.ps1*' }).Count | Should -Be 1
         }
 
+        It 'keeps a last line that has no newline intact, and adds the shim once' {
+            $profilePath = Join-Path $TestDrive 'no-newline.ps1'
+            [IO.File]::WriteAllText($profilePath, 'Import-Module posh-git')
+            Install-IgniteProfileShim -ProfilePath $profilePath
+            Install-IgniteProfileShim -ProfilePath $profilePath
+            $lines = @(Get-Content -LiteralPath $profilePath)
+            $lines[0] | Should -Be 'Import-Module posh-git'
+            @($lines | Where-Object { $_ -like '*.config*powershell*profile.ps1*' }).Count | Should -Be 1
+        }
+
         It 'keeps what is already in the profile' {
             $profilePath = Join-Path $TestDrive 'existing.ps1'
             Set-Content -LiteralPath $profilePath -Value 'Set-Alias ll Get-ChildItem'
@@ -86,6 +96,23 @@ Describe 'PowerShell profile and Windows Terminal' {
             $before = Get-Content -Raw -LiteralPath $Settings
             Update-IgniteTerminalSettings -Path $Settings | Should -BeFalse
             Get-Content -Raw -LiteralPath $Settings | Should -BeExactly $before
+        }
+
+        It 'configures Windows Terminal once and then leaves the owner''s changes alone' {
+            $marker = Join-Path $TestDrive "marker-$([guid]::NewGuid())"
+            Invoke-IgniteTerminalSetup -SettingsPath $Settings -MarkerPath $marker | Should -Be 'updated'
+            Test-Path -LiteralPath $marker | Should -BeTrue
+            $json = Get-Content -Raw -LiteralPath $Settings | ConvertFrom-Json -AsHashtable
+            $json['profiles']['defaults']['colorScheme'] = 'One Half Dark'
+            $json | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $Settings
+            Invoke-IgniteTerminalSetup -SettingsPath $Settings -MarkerPath $marker | Should -Be 'done-before'
+            (Get-Content -Raw -LiteralPath $Settings | ConvertFrom-Json).profiles.defaults.colorScheme | Should -Be 'One Half Dark'
+        }
+
+        It 'reports a missing settings file and tries again next time' {
+            $marker = Join-Path $TestDrive "marker-$([guid]::NewGuid())"
+            Invoke-IgniteTerminalSetup -SettingsPath (Join-Path $TestDrive 'nope.json') -MarkerPath $marker | Should -Be 'no-settings'
+            Test-Path -LiteralPath $marker | Should -BeFalse
         }
 
         It 'handles the older profiles-as-a-list format' {

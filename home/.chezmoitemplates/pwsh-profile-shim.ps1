@@ -13,6 +13,12 @@ function Install-IgniteProfileShim {
         $existing = @(Get-Content -LiteralPath $ProfilePath)
     }
     if ($existing -notcontains $line) {
+        # A last line without a newline would get the shim glued onto it.
+        $text = ''
+        if (Test-Path -LiteralPath $ProfilePath) { $text = [IO.File]::ReadAllText($ProfilePath) }
+        if ($text -and -not $text.EndsWith("`n")) {
+            [IO.File]::AppendAllText($ProfilePath, [Environment]::NewLine)
+        }
         Add-Content -LiteralPath $ProfilePath -Value $line -Encoding utf8NoBOM
     }
 }

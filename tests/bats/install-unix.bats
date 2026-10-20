@@ -40,7 +40,7 @@ render_script() {
 # on PATH, and with Homebrew's shellenv disabled (it would put the real
 # /opt/homebrew/bin ahead of the stubs).
 run_script() {
-  run env PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" IG_BREW_SEARCH="" bash "$1"
+  run env -u XDG_DATA_HOME -u KREW_ROOT PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" IG_BREW_SEARCH="" bash "$1"
   ! grep -q '^unexpected call' <<< "$output" || { echo "$output"; return 1; }
 }
 
@@ -55,6 +55,19 @@ fixture_with_choice() {
   cp "$FIXTURES/config/$1.toml" "$path"
   printf '%s = "%s"\n' "$2" "$3" >> "$path"
   echo "$path"
+}
+
+@test "install: a set XDG_DATA_HOME or KREW_ROOT can't put real tools ahead of the stubs" {
+  script=$(render_script darwin-admin run_onchange_after_10-brew.sh.tmpl)
+  stub brew
+  # A "real" brew in the mise shims and krew dirs a developer's env might point at.
+  for dir in "$BATS_TEST_TMPDIR/xdg/mise/shims" "$BATS_TEST_TMPDIR/krew/bin"; do
+    mkdir -p "$dir"
+    printf '#!/bin/sh\necho REAL-BREW-RAN >> "%s"\n' "$CALLS" > "$dir/brew"
+    chmod +x "$dir/brew"
+  done
+  XDG_DATA_HOME="$BATS_TEST_TMPDIR/xdg" KREW_ROOT="$BATS_TEST_TMPDIR/krew" run_script "$script"
+  ! grep -q REAL-BREW-RAN "$CALLS"
 }
 
 @test "install: brew script empty on noadmin and non-darwin" {

@@ -20,6 +20,15 @@ Describe 'Sync-IgniteSecretsFile' {
         $lines | Should -Contain "`$env:GITLAB_USERNAME = ''"
     }
 
+    It 'keeps a last line that has no newline intact' {
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $File) | Out-Null
+        [IO.File]::WriteAllText($File, "`$env:GITLAB_PRIVATE_TOKEN = 'abc'")
+        Sync-IgniteSecretsFile -Path $File -Names @('GITLAB_PRIVATE_TOKEN', 'GITLAB_USERNAME')
+        $lines = Get-Content -LiteralPath $File
+        $lines | Should -Contain "`$env:GITLAB_PRIVATE_TOKEN = 'abc'"
+        $lines | Should -Contain "`$env:GITLAB_USERNAME = ''"
+    }
+
     It 'keeps existing values byte-identical and appends only missing names' {
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $File) | Out-Null
         $original = "`$env:GITLAB_PRIVATE_TOKEN = 'a b`$c`"d'`n# my note`n"

@@ -1,16 +1,19 @@
 {{- $selected := includeTemplate "selected.json" . | fromJson -}}
 {{- if and (eq .ignite.os "windows") (hasKey $selected "windows-terminal") -}}
-# Runs on every apply; only writes settings.json when a value differs.
+# Runs on every apply, but configures Windows Terminal only once per machine
+# (a marker file records it), so later changes made in WT stay.
 {{ template "lib.ps1" . }}
 {{ template "windows-terminal-settings.ps1" . }}
 Reset-IgniteReport -Source windows-terminal
 $settings = Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'
-if (-not (Test-Path -LiteralPath $settings)) {
-    Add-IgniteReport -Source windows-terminal -Status skipped -Item windows-terminal -Detail 'open Windows Terminal once, then chezmoi apply'
-}
-else {
-    Invoke-IgniteTry -Source windows-terminal -Item windows-terminal -ScriptBlock {
-        if (Update-IgniteTerminalSettings -Path $settings) { Write-Output 'Windows Terminal settings updated' }
+$marker = Join-Path $env:LOCALAPPDATA 'ignite\windows-terminal-configured'
+Invoke-IgniteTry -Source windows-terminal -Item windows-terminal -ScriptBlock {
+    $result = Invoke-IgniteTerminalSetup -SettingsPath $settings -MarkerPath $marker
+    if ($result -eq 'no-settings') {
+        Add-IgniteReport -Source windows-terminal -Status skipped -Item windows-terminal -Detail 'open Windows Terminal once, then chezmoi apply'
+    }
+    elseif ($result -eq 'updated') {
+        Write-Output 'Windows Terminal settings updated'
     }
 }
 {{ end -}}

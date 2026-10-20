@@ -129,6 +129,16 @@ secrets_script() {
   cmp "$file" "$BATS_TEST_TMPDIR/original"
 }
 
+@test "secrets: a last line without a newline stays intact" {
+  file="$HOME/.config/ignite/secrets.env"
+  mkdir -p "$(dirname "$file")"
+  printf '%s' "GITLAB_PRIVATE_TOKEN='a b\$c\"d'" > "$file"
+  script=$(secrets_script linux-admin)
+  bash "$script"
+  bash "$script"
+  [ "$(cat "$file")" = "$(printf '%s\n%s' "GITLAB_PRIVATE_TOKEN='a b\$c\"d'" 'GITLAB_USERNAME=')" ]
+}
+
 @test "secrets: a name set with export counts as present" {
   file="$HOME/.config/ignite/secrets.env"
   mkdir -p "$(dirname "$file")"

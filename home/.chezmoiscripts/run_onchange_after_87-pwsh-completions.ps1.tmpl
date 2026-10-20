@@ -12,15 +12,18 @@ $completions = Join-Path $HOME '.cache/ignite/completions'
 New-Item -ItemType Directory -Force -Path $completions | Out-Null
 
 function Save-IgniteCompletion {
-    param([string]$Name, [string]$Bin)
+    param([string]$Name, [string]$Bin, [string]$Flag = '')
     Invoke-IgniteTry -Source completions -Item $Name -ScriptBlock {
-        $text = & $Bin completion powershell | Out-String
+        $completionArgs = @('completion')
+        if ($Flag) { $completionArgs += $Flag }
+        $completionArgs += 'powershell'
+        $text = & $Bin @completionArgs | Out-String
         if ($LASTEXITCODE -ne 0) { throw "$Bin completion powershell exited $LASTEXITCODE" }
         Set-Content -LiteralPath (Join-Path $completions "$Bin.ps1") -Value $text -Encoding utf8NoBOM
     }.GetNewClosure()
 }
 {{  range $name := $items }}
 {{-   $entry := get $selected $name }}
-Save-IgniteCompletion -Name '{{ $name }}' -Bin '{{ get $entry "bin" | default $name }}'
+Save-IgniteCompletion -Name '{{ $name }}' -Bin '{{ get $entry "bin" | default $name }}'{{ with get $entry "completion_flag" }} -Flag '{{ . }}'{{ end }}
 {{- end }}
 {{ end -}}

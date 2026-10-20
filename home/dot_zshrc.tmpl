@@ -19,6 +19,9 @@ export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
 {{- end }}
 
 export ZSH="$HOME/.oh-my-zsh"
+# chezmoi keeps oh-my-zsh up to date; its own updater would also call git on
+# every start (and on a Mac without Xcode's tools, pop the install dialog).
+zstyle ':omz:update' mode disabled
 {{- if hasKey $selected "zsh-completions" }}
 fpath+=("$ZSH/custom/plugins/zsh-completions/src")
 {{- end }}
@@ -79,7 +82,7 @@ _lazy_completion() {
 {{- range $name, $entry := $selected }}
 {{-   $bin := get $entry "bin" | default $name }}
 {{-   if and (eq (toString (get $entry "completion")) "cobra") (ne $name "kubectl") }}
-command -v {{ $bin }} &>/dev/null && _lazy_completion {{ $bin }} '{{ $bin }} completion zsh'
+command -v {{ $bin }} &>/dev/null && _lazy_completion {{ $bin }} '{{ $bin }} completion {{ with get $entry "completion_flag" }}{{ . }} {{ end }}zsh'
 {{-   else if eq (toString (get $entry "completion")) "complete-c" }}
 command -v {{ $bin }} &>/dev/null && autoload -U +X bashcompinit && bashcompinit && complete -C {{ $bin }} {{ $bin }}
 {{-   end }}

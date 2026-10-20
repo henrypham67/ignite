@@ -41,3 +41,17 @@ function Update-IgniteTerminalSettings {
     }
     return $changed
 }
+
+# Set those values once per machine; after that the owner's own changes in
+# Windows Terminal stay. Returns no-settings (WT never opened yet: try again
+# next apply), done-before, updated or unchanged.
+function Invoke-IgniteTerminalSetup {
+    param([Parameter(Mandatory)][string]$SettingsPath, [Parameter(Mandatory)][string]$MarkerPath)
+    if (Test-Path -LiteralPath $MarkerPath) { return 'done-before' }
+    if (-not (Test-Path -LiteralPath $SettingsPath)) { return 'no-settings' }
+    $changed = Update-IgniteTerminalSettings -Path $SettingsPath
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $MarkerPath) | Out-Null
+    Set-Content -LiteralPath $MarkerPath -Value (Get-Date -Format o) -Encoding utf8NoBOM
+    if ($changed) { return 'updated' }
+    return 'unchanged'
+}

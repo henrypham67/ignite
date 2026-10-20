@@ -335,11 +335,13 @@ packages:
     group: core
     mise: github-cli
     completion: cobra
+    completion_flag: "-s"   # `gh completion zsh` prints bash; it wants `-s zsh`
   glab:
     job: gitlab_cli
     group: gitlab
     mise: glab
     completion: cobra
+    completion_flag: "-s"
 
   # --------------------------------------------------------------- CLI basics
   jq:

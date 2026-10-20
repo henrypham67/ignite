@@ -79,6 +79,19 @@ fixture_with_choice() {
   grep -q 'complete -C vault vault' <<< "$output"
 }
 
+@test "zshrc: gh and glab completions ask for the shell with -s" {
+  run zshrc linux-admin
+  grep -q "_lazy_completion gh 'gh completion -s zsh'" <<< "$output"
+  grep -q "_lazy_completion glab 'glab completion -s zsh'" <<< "$output"
+}
+
+@test "zshrc: oh-my-zsh self-update is off (chezmoi updates it)" {
+  run zshrc darwin-admin
+  line=$(grep -n "zstyle ':omz:update' mode disabled" <<< "$output" | cut -d: -f1)
+  omz=$(grep -n 'source "$ZSH/oh-my-zsh.sh"' <<< "$output" | cut -d: -f1)
+  [ -n "$line" ] && [ "$line" -lt "$omz" ]
+}
+
 @test "zshrc: GITLAB_URL only on linux-admin" {
   run zshrc linux-admin
   grep -qx "export GITLAB_URL='https://gitlab.example.com'" <<< "$output"

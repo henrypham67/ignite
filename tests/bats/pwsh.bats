@@ -10,7 +10,7 @@ SCRIPTS="$REPO/home/.chezmoiscripts"
   [ "$status" -eq 0 ]
   grep -qx "Save-IgniteCompletion -Name 'flux' -Bin 'flux'" <<< "$output"
   grep -qx "Save-IgniteCompletion -Name 'kubectl' -Bin 'kubectl'" <<< "$output"
-  grep -qx "Save-IgniteCompletion -Name 'gh' -Bin 'gh'" <<< "$output"
+  grep -qx "Save-IgniteCompletion -Name 'gh' -Bin 'gh' -Flag '-s'" <<< "$output"
   ! grep -q "'vault'" <<< "$output"
   run render_file darwin-admin "$SCRIPTS/run_onchange_after_87-pwsh-completions.ps1.tmpl"
   [ -z "$(tr -d '[:space:]' <<< "$output")" ]
