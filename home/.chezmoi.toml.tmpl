@@ -25,6 +25,16 @@
 {{- if hasKey $prev "admin" }}{{ $admin = $prev.admin }}{{ end -}}
 {{- with env "IGNITE_ADMIN" }}{{ $admin = eq . "1" }}{{ end -}}
 
+{{- /* Windows without winget (App Installer blocked, LTSC) uses Scoop instead. */ -}}
+{{- $winget := true -}}
+{{- if hasKey $prev "winget" }}{{ $winget = $prev.winget }}{{ end -}}
+{{- with env "IGNITE_WINGET" }}{{ $winget = eq . "1" }}{{ end -}}
+
+{{- /* No usable git (a Mac without Xcode's tools): chezmoi uses its own. */ -}}
+{{- $builtinGit := false -}}
+{{- if hasKey $prev "builtin_git" }}{{ $builtinGit = $prev.builtin_git }}{{ end -}}
+{{- with env "IGNITE_BUILTIN_GIT" }}{{ $builtinGit = eq . "1" }}{{ end -}}
+
 {{- $caCert := get $prev "ca_cert" | default "" -}}
 {{- with env "IGNITE_CA_CERT_INSTALLED" }}{{ $caCert = . }}{{ end -}}
 {{- $caBundle := get $prev "ca_bundle" | default "" -}}
@@ -99,8 +109,13 @@
       "customize_choices" $customize
       "choices" $choices
       "ca_cert" $caCert
-      "ca_bundle" $caBundle -}}
+      "ca_bundle" $caBundle
+      "winget" $winget
+      "builtin_git" $builtinGit -}}
 {{- $config := dict "data" (dict "ignite" $ignite) -}}
+{{- if $builtinGit -}}
+{{-   $_ := set $config "useBuiltinGit" "true" -}}
+{{- end -}}
 {{- if eq $os "windows" -}}
 {{-   $_ := set $config "interpreters" (dict "ps1" (dict "command" "pwsh" "args" (list "-NoLogo" "-NoProfile" "-File"))) -}}
 {{- end -}}

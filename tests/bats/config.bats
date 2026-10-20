@@ -93,6 +93,20 @@ choice_lines() {
   [ "$(value_of "$output" ca_bundle)" = "/tmp/ca-bundle.pem" ]
 }
 
+@test "config: winget availability recorded, default true" {
+  run --separate-stderr render_init "$TEMPLATE" "${base_answers[@]}" --promptBool "Change default tool choices=false"
+  [ "$(value_of "$output" winget)" = "true" ]
+  IGNITE_WINGET=0 run --separate-stderr render_init "$TEMPLATE" "${base_answers[@]}" --promptBool "Change default tool choices=false"
+  [ "$(value_of "$output" winget)" = "false" ]
+}
+
+@test "config: built-in git is persisted when the bootstrap found no git" {
+  run --separate-stderr render_init "$TEMPLATE" "${base_answers[@]}" --promptBool "Change default tool choices=false"
+  ! grep -q useBuiltinGit <<< "$output"
+  IGNITE_BUILTIN_GIT=1 run --separate-stderr render_init "$TEMPLATE" "${base_answers[@]}" --promptBool "Change default tool choices=false"
+  [ "$(value_of "$output" useBuiltinGit)" = "true" ]
+}
+
 @test "config: customize=false writes no choices table entries" {
   run --separate-stderr render_init "$TEMPLATE" "${base_answers[@]}" --promptBool "Change default tool choices=false"
   [ "$status" -eq 0 ]

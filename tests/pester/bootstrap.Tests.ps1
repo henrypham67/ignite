@@ -89,34 +89,114 @@ Describe 'bootstrap.ps1' {
         }
 
         It 'defaults to the public repo URL' {
-            Get-IgniteChezmoiArgs -Forward @() |
-                Should -Be @('init', '--apply', 'https://github.com/henrypham67/ignite.git')
+            $a = Get-IgniteChezmoiArgs -Forward @()
+            $a.Global | Should -BeNullOrEmpty
+            $a.Init | Should -Be @('init', 'https://github.com/henrypham67/ignite.git')
         }
 
         It 'honours IGNITE_REPO and IGNITE_REF' {
             $env:IGNITE_REPO = 'someone/fork'
             $env:IGNITE_REF = 'dev'
-            Get-IgniteChezmoiArgs -Forward @() |
-                Should -Be @('init', '--apply', 'https://github.com/someone/fork.git', '--branch', 'dev')
+            (Get-IgniteChezmoiArgs -Forward @()).Init |
+                Should -Be @('init', 'https://github.com/someone/fork.git', '--branch', 'dev')
         }
 
         It 'uses --source for a local checkout' {
             $env:IGNITE_LOCAL_SOURCE = 'C:\src\ignite'
-            Get-IgniteChezmoiArgs -Forward @() | Should -Be @('init', '--apply', '--source', 'C:\src\ignite')
+            $a = Get-IgniteChezmoiArgs -Forward @()
+            $a.Global | Should -Be @('--source', 'C:\src\ignite')
+            $a.Init | Should -Be @('init')
         }
 
         It 'forwards extra args in order' {
-            Get-IgniteChezmoiArgs -Forward @('--no-tty', '--promptString', 'Work email for git=ci@example.com') |
-                Should -Be @('init', '--apply', 'https://github.com/henrypham67/ignite.git', '--no-tty', '--promptString', 'Work email for git=ci@example.com')
+            (Get-IgniteChezmoiArgs -Forward @('--no-tty', '--promptString', 'Work email for git=ci@example.com')).Init |
+                Should -Be @('init', 'https://github.com/henrypham67/ignite.git', '--no-tty', '--promptString', 'Work email for git=ci@example.com')
         }
 
         It 'uses the built-in git when git is missing' {
             Mock Test-IgniteGitAvailable { $false }
-            (Get-IgniteChezmoiArgs -Forward @())[0..2] | Should -Be @('--use-builtin-git', 'on', 'init')
+            (Get-IgniteChezmoiArgs -Forward @()).Global | Should -Be @('--use-builtin-git', 'on')
         }
 
         It 'never passes --force' {
-            Get-IgniteChezmoiArgs -Forward @('--no-tty') | Should -Not -Contain '--force'
+            $a = Get-IgniteChezmoiArgs -Forward @('--no-tty')
+            @($a.Global) + @($a.Init) | Should -Not -Contain '--force'
+        }
+    }
+
+    Context 'Set-IgniteExecutionPolicy' {
+        It 'leaves a policy alone that already lets scripts run' -ForEach @('RemoteSigned', 'Bypass', 'Unrestricted', 'AllSigned') {
+            Mock Get-ExecutionPolicy { $_ }
+            Mock Set-ExecutionPolicy {}
+            Set-IgniteExecutionPolicy
+            Should -Invoke Set-ExecutionPolicy -Times 0
+        }
+
+        It 'sets RemoteSigned for the user when scripts are blocked' {
+            Mock Get-ExecutionPolicy { 'Restricted' }
+            Mock Set-ExecutionPolicy {}
+            Set-IgniteExecutionPolicy
+            Should -Invoke Set-ExecutionPolicy -Times 1 -ParameterFilter { $ExecutionPolicy -eq 'RemoteSigned' -and $Scope -eq 'CurrentUser' }
+        }
+
+        It 'does not stop the run when the policy is overridden elsewhere' {
+            Mock Get-ExecutionPolicy { 'Undefined' }
+            Mock Set-ExecutionPolicy { throw 'ExecutionPolicyOverride' }
+            $ErrorActionPreference = 'Stop'
+            { Set-IgniteExecutionPolicy } | Should -Not -Throw
+        }
+    }
+
+    Context 'Test-IgniteWsl' {
+        It 'returns false instead of throwing when wsl.exe writes an error' {
+            function global:wsl.exe { Write-Error 'WSL is not enabled' }
+            try {
+                Mock Get-Command { [pscustomobject]@{ Name = 'wsl.exe' } } -ParameterFilter { $Name -eq 'wsl.exe' }
+                $ErrorActionPreference = 'Stop'
+                { Test-IgniteWsl } | Should -Not -Throw
+                Test-IgniteWsl | Should -BeFalse
+            }
+            finally { Remove-Item function:global:wsl.exe }
+        }
+    }
+
+    Context 'elevation' {
+        It 'quotes the script path for the elevated PowerShell' {
+            $argList = Get-IgniteElevatedArgument -Script 'C:\Users\A B\AppData\Local\Temp\ignite-admin.ps1'
+            ($argList -join ' ') | Should -BeLike '*-File "C:\Users\A B\AppData\Local\Temp\ignite-admin.ps1"'
+        }
+
+        It 'reports a declined UAC prompt instead of throwing' {
+            Mock Test-IgniteIsElevated { $false }
+            Mock Start-Process { throw 'The operation was canceled by the user.' }
+            Invoke-IgniteElevated -Command 'Write-Output hi' | Should -BeFalse
+        }
+    }
+
+    Context 'Backup-IgniteTarget' {
+        It 'copies existing targets into a backup folder, keeping their paths' {
+            $fakeHome = Join-Path $TestDrive 'home'
+            New-Item -ItemType Directory -Force -Path (Join-Path $fakeHome '.ssh') | Out-Null
+            Set-Content -LiteralPath (Join-Path $fakeHome '.gitconfig') -Value 'company'
+            Set-Content -LiteralPath (Join-Path $fakeHome '.ssh/config') -Value 'Host corp'
+            $backup = Backup-IgniteTarget -HomePath $fakeHome -Paths @('.gitconfig', '.ssh/config', '.bashrc')
+            Get-Content -LiteralPath (Join-Path $backup '.gitconfig') | Should -Be 'company'
+            Get-Content -LiteralPath (Join-Path $backup '.ssh/config') | Should -Be 'Host corp'
+            Test-Path -LiteralPath (Join-Path $backup '.bashrc') | Should -BeFalse
+        }
+
+        It 'returns nothing when there is nothing to save' {
+            Backup-IgniteTarget -HomePath (Join-Path $TestDrive 'empty') -Paths @('.gitconfig') | Should -BeNullOrEmpty
+        }
+    }
+
+    Context 'running through irm | iex' {
+        It 'never exits from inside Main, and only exits at the top level when run from a file' {
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile($Bootstrap, [ref]$null, [ref]$null)
+            $main = $ast.Find({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Main' }, $true)
+            $main.FindAll({ param($n) $n -is [System.Management.Automation.Language.ExitStatementAst] }, $true) | Should -BeNullOrEmpty
+            $last = (Get-Content -LiteralPath $Bootstrap | Where-Object { $_ -match '\S' })[-1]
+            $last | Should -Match 'PSCommandPath'
         }
     }
 

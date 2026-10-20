@@ -139,11 +139,12 @@ function Install-IgniteCa {
     if ($source -ne $ca) { Copy-Item -LiteralPath $source -Destination $ca -Force }
 
     # Trust it in Windows first, so the downloads below get through the proxy.
+    $imported = $false
     if ($CanElevate) {
         $command = "Import-Certificate -FilePath '$ca' -CertStoreLocation Cert:\LocalMachine\Root | Out-Null"
-        Invoke-IgniteElevated -Command $command
+        $imported = Invoke-IgniteElevated -Command $command
     }
-    else {
+    if (-not $imported) {
         Write-IgniteLog 'adding the company CA to your user trust store (confirm the dialog)'
         Import-Certificate -FilePath $ca -CertStoreLocation Cert:\CurrentUser\Root | Out-Null
     }
@@ -163,22 +164,68 @@ function Install-IgniteCa {
 
 # ------------------------------------------------------------ prerequisites
 
+# Start-Process joins -ArgumentList with spaces and doesn't quote, so a temp
+# path with a space ("C:\Users\Jane Doe\...") must be quoted by hand.
+function Get-IgniteElevatedArgument {
+    param([Parameter(Mandatory = $true)][string]$Script)
+    return @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$Script`"")
+}
+
 # Run a block of PowerShell elevated, once: inline when this shell already is,
-# otherwise through a single UAC prompt.
+# otherwise through a single UAC prompt. Returns $false when the prompt was
+# declined (or elevation failed), so the caller can take the no-admin path.
 function Invoke-IgniteElevated {
     param([Parameter(Mandatory = $true)][string]$Command)
     if (Test-IgniteIsElevated) {
         & ([scriptblock]::Create($Command))
-        return
+        return $true
     }
     $script = Join-Path ([IO.Path]::GetTempPath()) "ignite-admin-$([guid]::NewGuid()).ps1"
     Set-Content -LiteralPath $script -Value $Command -Encoding UTF8
     try {
-        Start-Process powershell -Verb RunAs -Wait -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $script)
+        Start-Process powershell -Verb RunAs -Wait -ArgumentList (Get-IgniteElevatedArgument -Script $script)
+        return $true
+    }
+    catch {
+        Write-IgniteLog "admin step did not run ($($_.Exception.Message)); continuing without admin"
+        return $false
     }
     finally {
         Remove-Item -LiteralPath $script -ErrorAction SilentlyContinue
     }
+}
+
+# Allow scripts for this user only when nothing allows them yet. A policy set
+# by GPO or by `-ExecutionPolicy` on the command line wins over CurrentUser,
+# and Set-ExecutionPolicy then throws; that must not stop the bootstrap.
+function Set-IgniteExecutionPolicy {
+    $policy = "$(Get-ExecutionPolicy)"
+    if (@('Restricted', 'Undefined') -notcontains $policy) { return }
+    try {
+        Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force -ErrorAction Stop
+    }
+    catch {
+        Write-IgniteLog "execution policy left as is ($($_.Exception.Message))"
+    }
+}
+
+# Copy the files the first apply is about to manage, so nothing a company
+# image shipped (.gitconfig, .ssh\config, ...) is lost. Returns the backup
+# folder, or nothing when there was nothing to save.
+function Backup-IgniteTarget {
+    param([Parameter(Mandatory = $true)][string]$HomePath, [string[]]$Paths = @())
+    $backup = Join-Path $HomePath ".config\ignite\backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+    $saved = $false
+    foreach ($path in $Paths) {
+        if (-not $path) { continue }
+        $source = Join-Path $HomePath $path
+        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { continue }
+        $target = Join-Path $backup $path
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
+        Copy-Item -LiteralPath $source -Destination $target
+        $saved = $true
+    }
+    if ($saved) { return $backup }
 }
 
 function Test-IgniteSkipped {
@@ -202,29 +249,40 @@ function Get-IgniteAdminCommand {
     return ($steps -join "`n")
 }
 
+# Under Windows PowerShell 5.1 with ErrorActionPreference Stop, any stderr
+# line from a redirected native command throws, so check with Continue.
 function Test-IgniteWsl {
     if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) { return $false }
-    & wsl.exe --status *> $null
-    return ($LASTEXITCODE -eq 0)
+    $ErrorActionPreference = 'Continue'
+    try {
+        & wsl.exe --status *> $null
+        return ($? -and $LASTEXITCODE -eq 0)
+    }
+    catch { return $false }
 }
 
-# Returns the WSL state after prerequisites: 'ready', 'reboot' or 'missing'.
+# Returns the WSL state after prerequisites: 'ready', 'reboot', 'skipped' or
+# 'missing'. Sets $script:IgniteAdminDeclined when the UAC prompt was declined.
 function Install-IgnitePrereqs {
     param([bool]$CanElevate)
     $wslBefore = Test-IgniteWsl
     $hasWinget = [bool](Get-Command winget -ErrorAction SilentlyContinue)
-    if (-not $hasWinget) {
+    $env:IGNITE_WINGET = '0'
+    if ($hasWinget) { $env:IGNITE_WINGET = '1' }
+    else {
         Add-IgniteBootstrapReport -Status needs-it -Item winget -Detail 'winget (App Installer) is missing; Scoop is used instead'
     }
+    $elevated = $false
     if ($CanElevate) {
         $command = Get-IgniteAdminCommand -HasWinget $hasWinget -NeedsWsl (-not $wslBefore)
         if ($command) {
             Write-IgniteLog 'installing admin prerequisites (one UAC prompt)'
-            Invoke-IgniteElevated -Command $command
+            $elevated = Invoke-IgniteElevated -Command $command
+            if (-not $elevated) { $script:IgniteAdminDeclined = $true }
         }
     }
 
-    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+    Set-IgniteExecutionPolicy
     if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
         Write-IgniteLog 'installing Scoop'
         $installer = Invoke-RestMethod -UseBasicParsing -Uri 'https://get.scoop.sh'
@@ -236,19 +294,19 @@ function Install-IgnitePrereqs {
         }
     }
     Update-IgniteSessionPath
-    if (-not $CanElevate -or -not $hasWinget) {
-        foreach ($app in @('git', 'pwsh')) {
-            if (-not (Get-Command $app -ErrorAction SilentlyContinue)) {
-                & scoop install $app
-                if ($LASTEXITCODE -ne 0) { Add-IgniteBootstrapReport -Status failed -Item $app -Detail 'scoop install failed' }
-            }
+    # Whatever happened above (no admin, no winget, a declined prompt, a failed
+    # install), git and pwsh must exist before chezmoi runs its scripts.
+    foreach ($app in @('git', 'pwsh')) {
+        if (-not (Get-Command $app -ErrorAction SilentlyContinue)) {
+            & scoop install $app
+            if ($LASTEXITCODE -ne 0) { Add-IgniteBootstrapReport -Status failed -Item $app -Detail 'scoop install failed' }
         }
     }
     Update-IgniteSessionPath
 
     if ($wslBefore) { return 'ready' }
     if (Test-IgniteSkipped -Item 'wsl') { return 'skipped' }
-    if ($CanElevate) { return 'reboot' }
+    if ($elevated) { return 'reboot' }
     return 'missing'
 }
 
@@ -271,22 +329,30 @@ function Install-IgniteTools {
 
 # ----------------------------------------------------------------- chezmoi
 
+# Global: flags for every chezmoi call (init, managed, apply). Init: the init
+# arguments. Apply runs separately so the first run can back files up first.
 function Get-IgniteChezmoiArgs {
     param([AllowEmptyCollection()][string[]]$Forward = @())
-    $result = @()
-    if (-not (Test-IgniteGitAvailable)) { $result += @('--use-builtin-git', 'on') }
-    $result += @('init', '--apply')
+    $globalArgs = @()
+    if (-not (Test-IgniteGitAvailable)) {
+        $globalArgs += @('--use-builtin-git', 'on')
+        $env:IGNITE_BUILTIN_GIT = '1'
+    }
+    $initArgs = @('init')
     if ($env:IGNITE_LOCAL_SOURCE) {
-        $result += @('--source', $env:IGNITE_LOCAL_SOURCE)
+        $globalArgs += @('--source', $env:IGNITE_LOCAL_SOURCE)
     }
     else {
         $repo = 'henrypham67/ignite'
         if ($env:IGNITE_REPO) { $repo = $env:IGNITE_REPO }
-        $result += "https://github.com/$repo.git"
+        $initArgs += "https://github.com/$repo.git"
     }
-    if ($env:IGNITE_REF) { $result += @('--branch', $env:IGNITE_REF) }
-    if ($Forward) { $result += $Forward }
-    return $result
+    if ($env:IGNITE_REF) { $initArgs += @('--branch', $env:IGNITE_REF) }
+    if ($Forward) {
+        $initArgs += $Forward
+        if ($Forward -contains '--no-tty') { $globalArgs += '--no-tty' }
+    }
+    return [pscustomobject]@{ Global = $globalArgs; Init = $initArgs }
 }
 
 function Install-IgniteWslDistro {
@@ -325,12 +391,27 @@ function Main {
     if ($env:IGNITE_CA_CERT) { Install-IgniteCa -Path $env:IGNITE_CA_CERT -CanElevate $canElevate }
 
     $wslState = Install-IgnitePrereqs -CanElevate $canElevate
+    if ($script:IgniteAdminDeclined) {
+        $canElevate = $false
+        $env:IGNITE_ADMIN = '0'
+    }
     Install-IgniteTools
 
+    $chezmoi = Join-Path $IgniteBin 'chezmoi.exe'
+    $firstRun = -not (Test-Path -LiteralPath (Join-Path $HOME '.config\chezmoi\chezmoi.toml'))
     $chezmoiArgs = Get-IgniteChezmoiArgs -Forward $Forward
-    Write-IgniteLog ("chezmoi " + ($chezmoiArgs -join ' '))
-    & (Join-Path $IgniteBin 'chezmoi.exe') @chezmoiArgs
-    if ($LASTEXITCODE -ne 0) { throw "chezmoi init --apply failed ($LASTEXITCODE)" }
+    $globalArgs = @($chezmoiArgs.Global)
+    $initArgs = @($chezmoiArgs.Init)
+    Write-IgniteLog ("chezmoi " + (($globalArgs + $initArgs) -join ' '))
+    & $chezmoi @globalArgs @initArgs
+    if ($LASTEXITCODE -ne 0) { throw "chezmoi init failed ($LASTEXITCODE)" }
+    if ($firstRun) {
+        $targets = @(& $chezmoi @globalArgs managed --include=files,symlinks --path-style=relative)
+        $backup = Backup-IgniteTarget -HomePath $HOME -Paths $targets
+        if ($backup) { Write-IgniteLog "existing files ignite will replace were copied to $backup" }
+    }
+    & $chezmoi @globalArgs apply
+    if ($LASTEXITCODE -ne 0) { throw "chezmoi apply failed ($LASTEXITCODE)" }
 
     Install-IgniteWslDistro -WslState $wslState
 
@@ -342,12 +423,16 @@ function Main {
     Write-Host "  $(Get-IgniteLinuxOneLiner -CaWslPath $caWsl)"
     Write-Host ''
 
+    $script:IgniteExitCode = 0
     $doctor = Join-Path $IgniteBin 'ignite-doctor.ps1'
     if (Test-Path -LiteralPath $doctor) {
         & pwsh -NoProfile -File $doctor
-        exit $LASTEXITCODE
+        $script:IgniteExitCode = $LASTEXITCODE
+        return
     }
     Write-IgniteLog 'done (ignite-doctor not found)'
 }
 
-if ($env:IGNITE_SOURCE_ONLY -ne '1') { Main -Forward $args }
+# `exit` would close the window when this runs through `irm | iex`, and the
+# doctor's checklist with it: only exit when run as a file.
+if ($env:IGNITE_SOURCE_ONLY -ne '1') { Main -Forward $args; if ($PSCommandPath) { exit $script:IgniteExitCode } else { $global:LASTEXITCODE = $script:IgniteExitCode } }

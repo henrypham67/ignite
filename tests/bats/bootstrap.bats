@@ -138,49 +138,73 @@ in_bootstrap() {
   grep -q '^sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ' "$CALLS"
 }
 
+# show_args: global flags (used for init, managed and apply) and init args,
+# each joined with "|" so arguments with spaces stay visible.
+SHOW_ARGS='printf "global:"; for a in ${IG_CHEZMOI_GLOBAL[@]+"${IG_CHEZMOI_GLOBAL[@]}"}; do printf "%s|" "$a"; done; printf "\ninit:"; for a in "${IG_CHEZMOI_INIT[@]}"; do printf "%s|" "$a"; done; echo'
+
 @test "bootstrap.sh: chezmoi args default to https://github.com/henrypham67/ignite.git" {
-  run in_bootstrap "OS=darwin; ig_chezmoi_args; printf '%s\n' \"\${IG_CHEZMOI_ARGS[@]}\""
+  run in_bootstrap "OS=darwin; ig_chezmoi_args; $SHOW_ARGS"
   [ "$status" -eq 0 ]
-  [ "$output" = "$(printf 'init\n--apply\nhttps://github.com/henrypham67/ignite.git')" ]
+  [ "$output" = "$(printf 'global:\ninit:init|https://github.com/henrypham67/ignite.git|')" ]
 }
 
 @test "bootstrap.sh: IGNITE_REPO and IGNITE_REF pick another repo and branch" {
-  IGNITE_REPO=someone/fork IGNITE_REF=dev run in_bootstrap "OS=darwin; ig_chezmoi_args; printf '%s\n' \"\${IG_CHEZMOI_ARGS[@]}\""
-  [ "$output" = "$(printf 'init\n--apply\nhttps://github.com/someone/fork.git\n--branch\ndev')" ]
+  IGNITE_REPO=someone/fork IGNITE_REF=dev run in_bootstrap "OS=darwin; ig_chezmoi_args; $SHOW_ARGS"
+  [ "${lines[1]}" = "init:init|https://github.com/someone/fork.git|--branch|dev|" ]
 }
 
 @test "bootstrap.sh: use --source when IGNITE_LOCAL_SOURCE set" {
-  IGNITE_LOCAL_SOURCE=/src run in_bootstrap "OS=darwin; ig_chezmoi_args; printf '%s\n' \"\${IG_CHEZMOI_ARGS[@]}\""
-  [ "$output" = "$(printf 'init\n--apply\n--source\n/src')" ]
+  IGNITE_LOCAL_SOURCE=/src run in_bootstrap "OS=darwin; ig_chezmoi_args; $SHOW_ARGS"
+  [ "$output" = "$(printf 'global:--source|/src|\ninit:init|')" ]
 }
 
 @test "bootstrap.sh: forward extra args in order" {
-  run in_bootstrap "OS=darwin; ig_chezmoi_args --no-tty --promptString 'Work email for git=ci@example.com'; printf '%s\n' \"\${IG_CHEZMOI_ARGS[@]}\""
-  [ "$output" = "$(printf 'init\n--apply\nhttps://github.com/henrypham67/ignite.git\n--no-tty\n--promptString\nWork email for git=ci@example.com')" ]
+  run in_bootstrap "OS=darwin; ig_chezmoi_args --no-tty --promptString 'Work email for git=ci@example.com'; $SHOW_ARGS"
+  [ "${lines[1]}" = "init:init|https://github.com/henrypham67/ignite.git|--no-tty|--promptString|Work email for git=ci@example.com|" ]
 }
 
 @test "bootstrap.sh: builtin git only when CLT missing on darwin" {
   stub xcode-select 'exit 2'
-  run in_bootstrap "OS=darwin; ig_chezmoi_args; printf '%s\n' \"\${IG_CHEZMOI_ARGS[@]}\""
-  [ "${lines[0]}" = "--use-builtin-git" ]
-  [ "${lines[1]}" = "on" ]
-  [ "${lines[2]}" = "init" ]
+  run in_bootstrap "OS=darwin; ig_chezmoi_args; $SHOW_ARGS; echo \"builtin=\$IGNITE_BUILTIN_GIT\""
+  [ "${lines[0]}" = "global:--use-builtin-git|on|" ]
+  [ "${lines[2]}" = "builtin=1" ]
 
   stub xcode-select 'echo /Library/Developer/CommandLineTools'
-  run in_bootstrap "OS=darwin; ig_chezmoi_args; printf '%s\n' \"\${IG_CHEZMOI_ARGS[@]}\""
-  [ "${lines[0]}" = "init" ]
+  run in_bootstrap "OS=darwin; ig_chezmoi_args; $SHOW_ARGS"
+  [ "${lines[0]}" = "global:" ]
 }
 
 @test "bootstrap.sh: builtin git on linux when git is missing" {
-  run in_bootstrap "OS=linux; PATH='$STUBS:/usr/bin/false-dir'; ig_chezmoi_args; printf '%s\n' \"\${IG_CHEZMOI_ARGS[@]}\""
-  [ "${lines[0]}" = "--use-builtin-git" ]
+  run in_bootstrap "OS=linux; PATH='$STUBS:/usr/bin/false-dir'; ig_chezmoi_args; $SHOW_ARGS"
+  [ "${lines[0]}" = "global:--use-builtin-git|on|" ]
 }
 
 @test "bootstrap.sh: chezmoi args never contain --force" {
-  run in_bootstrap "OS=darwin; ig_chezmoi_args --no-tty; printf '%s\n' \"\${IG_CHEZMOI_ARGS[@]}\""
+  run in_bootstrap "OS=darwin; ig_chezmoi_args --no-tty; $SHOW_ARGS"
   [ "$status" -eq 0 ]
-  grep -qx -- '--apply' <<< "$output"
-  ! grep -qx -- '--force' <<< "$output"
+  [[ "$output" == *"init:init|"* ]]
+  [[ "$output" != *--force* ]]
+}
+
+@test "bootstrap.sh: first-run backup copies existing targets, keeping their paths" {
+  mkdir -p "$HOME/.ssh" "$HOME/.config/git"
+  printf 'company zshrc\n' > "$HOME/.zshrc"
+  printf 'Host corp\n' > "$HOME/.ssh/config"
+  run in_bootstrap "printf '%s\n' .zshrc .ssh/config .gitconfig .config/git | ig_backup_targets"
+  [ "$status" -eq 0 ]
+  backup="${lines[${#lines[@]}-1]}"
+  [[ "$backup" == "$HOME/.config/ignite/backup-"* ]]
+  [ "$(cat "$backup/.zshrc")" = "company zshrc" ]
+  [ "$(cat "$backup/.ssh/config")" = "Host corp" ]
+  [ ! -e "$backup/.gitconfig" ]
+  [ ! -e "$backup/.config/git" ]
+}
+
+@test "bootstrap.sh: first-run backup with nothing to save prints nothing" {
+  run in_bootstrap "printf '%s\n' .zshrc .gitconfig | ig_backup_targets"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ ! -d "$HOME/.config/ignite" ]
 }
 
 @test "bootstrap.sh: no admin on darwin records missing CLT as needs-it" {
@@ -197,9 +221,13 @@ in_bootstrap() {
   run in_bootstrap /bin/bash 'ig_detect_os; ig_detect_admin darwin'
   [ "$status" -eq 0 ]
   [ "$output" = "$(printf 'darwin\n0')" ]
-  run in_bootstrap /bin/bash "OS=darwin; ig_chezmoi_args --no-tty --promptString 'a b=c d'; printf '%s\n' \"\${IG_CHEZMOI_ARGS[@]}\""
+  run in_bootstrap /bin/bash "OS=darwin; ig_chezmoi_args --no-tty --promptString 'a b=c d'; $SHOW_ARGS"
   [ "$status" -eq 0 ]
-  [ "${lines[5]}" = "a b=c d" ]
+  [ "${lines[1]}" = "init:init|https://github.com/henrypham67/ignite.git|--no-tty|--promptString|a b=c d|" ]
+  printf 'x\n' > "$HOME/.zshrc"
+  run in_bootstrap /bin/bash "printf '%s\n' .zshrc | ig_backup_targets"
+  [ "$status" -eq 0 ]
+  [ -f "${lines[0]}/.zshrc" ]
   printf 'C\n' > "$HOME/c.pem"
   printf 'R\n' > "$BATS_TEST_TMPDIR/roots.pem"
   IGNITE_SYSTEM_ROOTS="$BATS_TEST_TMPDIR/roots.pem" IGNITE_CA_CERT='~/c.pem' run in_bootstrap /bin/bash 'ig_setup_ca darwin 0; echo ok'

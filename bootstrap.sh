@@ -204,29 +204,56 @@ ig_install_tools() {
 
 # ------------------------------------------------------------------ chezmoi
 
-# ig_chezmoi_args <forwarded args...>: fill IG_CHEZMOI_ARGS. Uses $OS.
+# ig_chezmoi_args <forwarded args...>: fill IG_CHEZMOI_GLOBAL (flags for every
+# chezmoi call: init, managed, apply) and IG_CHEZMOI_INIT. Uses $OS. Apply
+# runs separately so the first run can back files up before replacing them.
 ig_chezmoi_args() {
-  IG_CHEZMOI_ARGS=()
-  local git_missing=0
+  IG_CHEZMOI_GLOBAL=()
+  IG_CHEZMOI_INIT=(init)
+  local git_missing=0 arg
   if [ "$OS" = darwin ]; then
     xcode-select -p >/dev/null 2>&1 || git_missing=1
   else
     command -v git >/dev/null 2>&1 || git_missing=1
   fi
   if [ "$git_missing" = 1 ]; then
-    IG_CHEZMOI_ARGS+=(--use-builtin-git on)
+    IG_CHEZMOI_GLOBAL+=(--use-builtin-git on)
+    # Recorded in the chezmoi config so later `chezmoi update` runs use it too.
+    export IGNITE_BUILTIN_GIT=1
   fi
-  IG_CHEZMOI_ARGS+=(init --apply)
   if [ -n "${IGNITE_LOCAL_SOURCE:-}" ]; then
-    IG_CHEZMOI_ARGS+=(--source "$IGNITE_LOCAL_SOURCE")
+    IG_CHEZMOI_GLOBAL+=(--source "$IGNITE_LOCAL_SOURCE")
   else
-    IG_CHEZMOI_ARGS+=("https://github.com/${IGNITE_REPO:-henrypham67/ignite}.git")
+    IG_CHEZMOI_INIT+=("https://github.com/${IGNITE_REPO:-henrypham67/ignite}.git")
   fi
   if [ -n "${IGNITE_REF:-}" ]; then
-    IG_CHEZMOI_ARGS+=(--branch "$IGNITE_REF")
+    IG_CHEZMOI_INIT+=(--branch "$IGNITE_REF")
   fi
-  if [ $# -gt 0 ]; then
-    IG_CHEZMOI_ARGS+=("$@")
+  for arg in "$@"; do
+    IG_CHEZMOI_INIT+=("$arg")
+    if [ "$arg" = --no-tty ]; then
+      IG_CHEZMOI_GLOBAL+=(--no-tty)
+    fi
+  done
+}
+
+# ig_backup_targets: read paths (relative to $HOME) on stdin and copy the ones
+# that already exist into ~/.config/ignite/backup-<time>/, so nothing a
+# company image shipped (.zshrc, .gitconfig, .ssh/config) is lost on the first
+# apply. Prints the backup folder, or nothing when there was nothing to save.
+ig_backup_targets() {
+  local backup path saved=""
+  backup="$IG_CONFIG/backup-$(date +%Y%m%d-%H%M%S)"
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    if [ -f "$HOME/$path" ] || [ -L "$HOME/$path" ]; then
+      mkdir -p "$(dirname "$backup/$path")"
+      cp -P "$HOME/$path" "$backup/$path"
+      saved=1
+    fi
+  done
+  if [ -n "$saved" ]; then
+    echo "$backup"
   fi
 }
 
@@ -248,9 +275,18 @@ main() {
   ig_install_prereqs "$OS" "$IGNITE_ADMIN"
   ig_install_tools
 
+  local first_run="" backup
+  [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.toml" ] || first_run=1
   ig_chezmoi_args "$@"
-  ig_log "chezmoi ${IG_CHEZMOI_ARGS[*]}"
-  "$IG_BIN/chezmoi" "${IG_CHEZMOI_ARGS[@]}" || ig_die "chezmoi init --apply failed"
+  ig_log "chezmoi ${IG_CHEZMOI_GLOBAL[*]+${IG_CHEZMOI_GLOBAL[*]}} ${IG_CHEZMOI_INIT[*]}"
+  "$IG_BIN/chezmoi" ${IG_CHEZMOI_GLOBAL[@]+"${IG_CHEZMOI_GLOBAL[@]}"} "${IG_CHEZMOI_INIT[@]}" || ig_die "chezmoi init failed"
+  if [ -n "$first_run" ]; then
+    backup=$("$IG_BIN/chezmoi" ${IG_CHEZMOI_GLOBAL[@]+"${IG_CHEZMOI_GLOBAL[@]}"} managed --include=files,symlinks --path-style=relative | ig_backup_targets)
+    if [ -n "$backup" ]; then
+      ig_log "existing files ignite will replace were copied to $backup"
+    fi
+  fi
+  "$IG_BIN/chezmoi" ${IG_CHEZMOI_GLOBAL[@]+"${IG_CHEZMOI_GLOBAL[@]}"} apply || ig_die "chezmoi apply failed"
 
   if [ -x "$IG_BIN/ignite-doctor" ]; then
     "$IG_BIN/ignite-doctor"

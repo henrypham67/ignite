@@ -145,6 +145,16 @@ problems() {
   [ "$(method sevenzip)" = winget ]
 }
 
+@test "selection: no winget on the machine falls back to scoop" {
+  with_catalog "$FIXTURES/catalogs/valid.yaml"
+  config="$BATS_TEST_TMPDIR/windows-no-winget.toml"
+  awk '{ print } /^admin = true$/ { print "winget = false" }' "$FIXTURES/config/windows-admin.toml" > "$config"
+  select_for "$config"
+  [ "$(method vscode)" = scoop ]
+  [ "$(method sevenzip)" = scoop ]
+  [ "$(method windows-terminal)" = needs_it ]
+}
+
 @test "selection: method order linux" {
   with_catalog "$FIXTURES/catalogs/valid.yaml"
   select_for linux-admin

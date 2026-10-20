@@ -8,6 +8,8 @@
 {{- includeTemplate "validate-catalog" . -}}
 {{- $os := .ignite.os -}}
 {{- $admin := .ignite.admin -}}
+{{- $winget := true -}}
+{{- if hasKey .ignite "winget" }}{{ $winget = .ignite.winget }}{{ end -}}
 {{- $choices := includeTemplate "effective-choices.json" . | fromJson -}}
 {{- $groupOn := dict
       "core" true
@@ -74,9 +76,9 @@
 {{-         $method = "script" -}}
 {{-       end -}}
 {{-     else if eq $os "windows" -}}
-{{-       if and $admin (hasKey $p "winget") -}}
+{{-       if and $admin $winget (hasKey $p "winget") -}}
 {{-         $method = "winget" -}}
-{{-       else if and (not $admin) (hasKey $p "winget") (get $p "winget_user") -}}
+{{-       else if and (not $admin) $winget (hasKey $p "winget") (get $p "winget_user") -}}
 {{-         $method = "winget_user" -}}
 {{-       else if hasKey $p "scoop" -}}
 {{-         $method = "scoop" -}}

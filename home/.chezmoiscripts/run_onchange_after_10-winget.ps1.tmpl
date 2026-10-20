@@ -37,7 +37,8 @@ try {
         & $file
     }
     else {
-        Start-Process pwsh -Verb RunAs -Wait -ArgumentList @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $file)
+        # Start-Process doesn't quote list items: a temp path with a space breaks -File.
+        Start-Process pwsh -Verb RunAs -Wait -ArgumentList @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$file`"")
     }
 }
 catch {
