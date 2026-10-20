@@ -18,6 +18,10 @@ run = "pwsh -NoLogo -NoProfile -Command 'Invoke-Pester -Path tests/pester -CI'"
 description = "Resolve the package catalog for every fixture machine"
 run = "scripts/validate-catalog.sh"
 
+[tasks.e2e-linux]
+description = "Bootstrap a throwaway Ubuntu container end to end (needs Docker)"
+run = "scripts/e2e-linux.sh"
+
 [tasks.lint]
 description = "shellcheck the shell scripts; PSScriptAnalyzer the PowerShell scripts"
 run = [
