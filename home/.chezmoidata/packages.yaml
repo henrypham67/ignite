@@ -418,6 +418,10 @@ packages:
     winget: Docker.DockerDesktop
     admin_only: true
     bin: docker
+    # The docker CLI alone (colima's docker-cli) must not look like Docker Desktop.
+    check_path:
+      darwin: Applications/Docker.app
+      windows: C:/Program Files/Docker/Docker/Docker Desktop.exe
   colima:
     job: container_engine
     option: colima

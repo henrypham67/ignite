@@ -1,0 +1,20 @@
+{{- /*
+  How ignite-doctor checks one catalog entry, as "<kind><TAB><value>".
+  Input: (dict "name" <entry name> "entry" <entry> "os" <os>).
+  Kinds: vscode (extension id), krew (plugin), path (relative to home, or
+  absolute), bin (command name), none (nothing to check).
+*/ -}}
+{{- $entry := .entry -}}
+{{- if hasKey $entry "vscode_ext" -}}
+{{    printf "vscode\t%s" $entry.vscode_ext }}
+{{- else if hasKey $entry "krew" -}}
+{{    printf "krew\t%s" $entry.krew }}
+{{- else if hasKey $entry "archive" -}}
+{{    printf "path\t%s" $entry.archive.dest }}
+{{- else if and (hasKey $entry "check_path") (hasKey $entry.check_path .os) -}}
+{{    printf "path\t%s" (get $entry.check_path .os) }}
+{{- else if eq (toString (get $entry "bin")) "false" -}}
+{{    printf "none\t-" }}
+{{- else -}}
+{{    printf "bin\t%s" (get $entry "bin" | default .name) }}
+{{- end -}}

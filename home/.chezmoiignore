@@ -10,6 +10,7 @@
 .bashrc
 .oh-my-zsh
 .oh-my-zsh/**
+.local/bin/ignite-doctor
 {{- end }}
 
 {{- if ne .ignite.os "windows" }}
@@ -18,6 +19,7 @@ AppData
 AppData/**
 .config/powershell
 .config/powershell/**
+.local/bin/ignite-doctor.ps1
 {{- end }}
 
 {{- if ne .ignite.os "darwin" }}
