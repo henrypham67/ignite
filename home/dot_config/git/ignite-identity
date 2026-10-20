@@ -1,0 +1,4 @@
+# Commits to the ignite repo (the chezmoi source dir) use the GitHub noreply
+# address, so a work email never lands in the public repo's history.
+[user]
+	email = 43398131+henrypham67@users.noreply.github.com

@@ -1,0 +1,9 @@
+{{- if eq .ignite.os "windows" -}}
+# One SSH key for the Windows side, created on first apply (WSL makes its own).
+# No passphrase so the run stays unattended; ignite-doctor suggests adding one.
+$key = Join-Path $HOME '.ssh/id_ed25519'
+if (-not (Test-Path -LiteralPath $key)) {
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $key) | Out-Null
+    ssh-keygen -q -t ed25519 -N '' -C "{{ .ignite.email }} $env:COMPUTERNAME" -f $key
+}
+{{ end -}}
