@@ -21,7 +21,7 @@ run = "scripts/validate-catalog.sh"
 [tasks.lint]
 description = "shellcheck the shell scripts; PSScriptAnalyzer the PowerShell scripts"
 run = [
-  "shellcheck scripts/*.sh .githooks/pre-commit tests/bats/helper.bash",
+  "shellcheck bootstrap.sh scripts/*.sh .githooks/pre-commit tests/bats/helper.bash",
   "pwsh -NoLogo -NoProfile -File scripts/lint-powershell.ps1",
   "scripts/lint-rendered.sh",
 ]
