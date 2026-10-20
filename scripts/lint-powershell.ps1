@@ -7,8 +7,13 @@ $root = Split-Path -Parent $PSScriptRoot
 $files = Get-ChildItem -Path $root -Recurse -Include '*.ps1', '*.psm1' -File |
     Where-Object { $_.FullName -notmatch '[\\/](\.git|\.superpowers|home)[\\/]' }
 
+# These are interactive scripts, not a module: console output is the point,
+# helper functions don't need -WhatIf, and names like Get-IgniteChezmoiArgs
+# return collections on purpose.
+$exclude = @('PSAvoidUsingWriteHost', 'PSUseShouldProcessForStateChangingFunctions', 'PSUseSingularNouns')
+
 $findings = foreach ($file in $files) {
-    Invoke-ScriptAnalyzer -Path $file.FullName -Severity Warning, Error
+    Invoke-ScriptAnalyzer -Path $file.FullName -Severity Warning, Error -ExcludeRule $exclude
 }
 
 if ($findings) {
