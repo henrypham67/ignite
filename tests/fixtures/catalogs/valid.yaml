@@ -119,6 +119,14 @@ packages:
     platforms: [darwin, linux]
     cask: editor-helper
     script: [linux]
+  snap-only-on-linux:
+    job: snap_thing
+    group: core
+    platforms: [darwin, linux]
+    mise: aqua:example/snap-thing
+    mise_skip: [linux]
+    script: [linux]
+    admin_only: [linux]
   hashicorp.terraform:
     job: terraform_lang
     group: core

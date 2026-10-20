@@ -120,6 +120,27 @@ Describe 'bootstrap.ps1' {
         }
     }
 
+    Context 'Get-IgniteAdminCommand' {
+        BeforeEach { $env:IGNITE_SKIP = $null }
+
+        It 'installs git and PowerShell with winget and enables WSL' {
+            $command = Get-IgniteAdminCommand -HasWinget $true -NeedsWsl $true
+            $command | Should -Match 'winget install --id Git\.Git'
+            $command | Should -Match 'winget install --id Microsoft\.PowerShell'
+            $command | Should -Match 'wsl\.exe --install --no-distribution'
+        }
+
+        It 'leaves winget out when it is missing' {
+            Get-IgniteAdminCommand -HasWinget $false -NeedsWsl $true | Should -Not -Match 'winget'
+        }
+
+        It 'leaves WSL out when it is already there or IGNITE_SKIP lists wsl' {
+            Get-IgniteAdminCommand -HasWinget $true -NeedsWsl $false | Should -Not -Match 'wsl'
+            $env:IGNITE_SKIP = 'docker-desktop,wsl'
+            Get-IgniteAdminCommand -HasWinget $true -NeedsWsl $true | Should -Not -Match 'wsl'
+        }
+    }
+
     Context 'Resolve-IgniteCaPath' {
         It 'expands ~ and makes relative paths absolute' {
             $file = Join-Path $TestDrive 'corp.pem'

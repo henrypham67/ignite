@@ -9,7 +9,9 @@
 {{- $selected := includeTemplate "selected.json" $root | fromJson -}}
 {{- $items := list -}}
 {{- range $name, $entry := $selected -}}
-{{-   if and (eq $entry.method "script") (eq (not (not (get $entry "admin_only"))) $.admin) }}{{ $items = append $items $name }}{{ end -}}
+{{-   $adminOnly := not (not (get $entry "admin_only")) -}}
+{{-   if kindIs "slice" (get $entry "admin_only") }}{{ $adminOnly = has $root.ignite.os $entry.admin_only }}{{ end -}}
+{{-   if and (eq $entry.method "script") (eq $adminOnly $.admin) }}{{ $items = append $items $name }}{{ end -}}
 {{- end -}}
 {{- if and (ne $root.ignite.os "windows") $items -}}
 #!/bin/bash

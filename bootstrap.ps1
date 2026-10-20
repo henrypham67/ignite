@@ -181,6 +181,27 @@ function Invoke-IgniteElevated {
     }
 }
 
+function Test-IgniteSkipped {
+    param([string]$Item)
+    $skip = @("$env:IGNITE_SKIP" -split ',' | ForEach-Object { $_.Trim() })
+    return ($skip -contains $Item)
+}
+
+# The admin-only prerequisites, as one block of PowerShell for a single UAC prompt.
+function Get-IgniteAdminCommand {
+    param([bool]$HasWinget, [bool]$NeedsWsl)
+    $steps = @()
+    if ($HasWinget) {
+        $winget = 'winget install --id {0} -e --silent --scope machine --accept-package-agreements --accept-source-agreements --disable-interactivity'
+        $steps += ($winget -f 'Git.Git')
+        $steps += ($winget -f 'Microsoft.PowerShell')
+    }
+    if ($NeedsWsl -and -not (Test-IgniteSkipped -Item 'wsl')) {
+        $steps += 'wsl.exe --install --no-distribution'
+    }
+    return ($steps -join "`n")
+}
+
 function Test-IgniteWsl {
     if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) { return $false }
     & wsl.exe --status *> $null
@@ -191,15 +212,16 @@ function Test-IgniteWsl {
 function Install-IgnitePrereqs {
     param([bool]$CanElevate)
     $wslBefore = Test-IgniteWsl
+    $hasWinget = [bool](Get-Command winget -ErrorAction SilentlyContinue)
+    if (-not $hasWinget) {
+        Add-IgniteBootstrapReport -Status needs-it -Item winget -Detail 'winget (App Installer) is missing; Scoop is used instead'
+    }
     if ($CanElevate) {
-        Write-IgniteLog 'installing admin prerequisites (one UAC prompt)'
-        $winget = 'winget install --id {0} -e --silent --scope machine --accept-package-agreements --accept-source-agreements --disable-interactivity'
-        $steps = @(
-            ($winget -f 'Git.Git'),
-            ($winget -f 'Microsoft.PowerShell')
-        )
-        if (-not $wslBefore) { $steps += 'wsl.exe --install --no-distribution' }
-        Invoke-IgniteElevated -Command ($steps -join "`n")
+        $command = Get-IgniteAdminCommand -HasWinget $hasWinget -NeedsWsl (-not $wslBefore)
+        if ($command) {
+            Write-IgniteLog 'installing admin prerequisites (one UAC prompt)'
+            Invoke-IgniteElevated -Command $command
+        }
     }
 
     Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
@@ -214,7 +236,7 @@ function Install-IgnitePrereqs {
         }
     }
     Update-IgniteSessionPath
-    if (-not $CanElevate) {
+    if (-not $CanElevate -or -not $hasWinget) {
         foreach ($app in @('git', 'pwsh')) {
             if (-not (Get-Command $app -ErrorAction SilentlyContinue)) {
                 & scoop install $app
@@ -225,6 +247,7 @@ function Install-IgnitePrereqs {
     Update-IgniteSessionPath
 
     if ($wslBefore) { return 'ready' }
+    if (Test-IgniteSkipped -Item 'wsl') { return 'skipped' }
     if ($CanElevate) { return 'reboot' }
     return 'missing'
 }
@@ -268,6 +291,10 @@ function Get-IgniteChezmoiArgs {
 
 function Install-IgniteWslDistro {
     param([string]$WslState)
+    if ($WslState -eq 'skipped') {
+        Add-IgniteBootstrapReport -Status skipped -Item WSL -Detail 'IGNITE_SKIP'
+        return
+    }
     if ($WslState -eq 'reboot') {
         Add-IgniteBootstrapReport -Status needs-it -Item WSL -Detail 'reboot then re-run the bootstrap'
         return

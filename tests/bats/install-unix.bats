@@ -194,7 +194,9 @@ fixture_with_choice() {
   grep -qx 'ig_try script hack-nerd-font ig_install_hack_nerd_font' "$user"
   grep -qx 'ig_try script vscode ig_install_vscode' "$user"
   grep -qx 'ig_try script-admin docker-engine ig_install_docker_engine' "$admin"
+  grep -qx 'ig_try script-admin ghostty ig_install_ghostty' "$admin"
   ! grep -q docker-engine "$user"
+  ! grep -q 'ig_install_ghostty' "$user"
   is_empty "$(render_script darwin-admin run_onchange_after_15-scripts-admin.sh.tmpl)"
 }
 

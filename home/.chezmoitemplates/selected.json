@@ -44,8 +44,14 @@
 {{-     else if get $p "script" -}}
 {{-       $script = true -}}
 {{-     end -}}
+{{-     $adminOnly := false -}}
+{{-     if kindIs "slice" (get $p "admin_only") -}}
+{{-       $adminOnly = has $os $p.admin_only -}}
+{{-     else if get $p "admin_only" -}}
+{{-       $adminOnly = true -}}
+{{-     end -}}
 {{-     $method := "needs_it" -}}
-{{-     if and (get $p "admin_only") (not $admin) -}}
+{{-     if and $adminOnly (not $admin) -}}
 {{-       $method = "needs_it" -}}
 {{-     else if get $p "bootstrap" -}}
 {{-       $method = "bootstrap" -}}

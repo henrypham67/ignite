@@ -161,6 +161,18 @@ problems() {
   [ "$(method homebrew)" = bootstrap ]
 }
 
+@test "selection: admin_only as a platform list applies only there" {
+  with_catalog "$FIXTURES/catalogs/valid.yaml"
+  select_for linux-admin
+  [ "$(method snap-only-on-linux)" = script ]
+  config="$BATS_TEST_TMPDIR/linux-noadmin.toml"
+  sed 's/^admin = true/admin = false/' "$FIXTURES/config/linux-admin.toml" > "$config"
+  select_for "$config"
+  [ "$(method snap-only-on-linux)" = needs_it ]
+  select_for darwin-noadmin
+  [ "$(method snap-only-on-linux)" = mise ]
+}
+
 @test "selection: container_engine computed" {
   with_catalog "$FIXTURES/catalogs/valid.yaml"
   select_for darwin-admin
