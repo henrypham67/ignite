@@ -38,6 +38,12 @@
 {{-   if or (not (hasKey $p "requires")) (hasKey $kept (toString $p.requires)) -}}
 {{-     $miseSkip := list -}}
 {{-     if hasKey $p "mise_skip" }}{{ $miseSkip = $p.mise_skip }}{{ end -}}
+{{-     $script := false -}}
+{{-     if kindIs "slice" (get $p "script") -}}
+{{-       $script = has $os $p.script -}}
+{{-     else if get $p "script" -}}
+{{-       $script = true -}}
+{{-     end -}}
 {{-     $method := "needs_it" -}}
 {{-     if and (get $p "admin_only") (not $admin) -}}
 {{-       $method = "needs_it" -}}
@@ -58,7 +64,7 @@
 {{-         $method = "cask" -}}
 {{-       else if and (not $admin) (hasKey $p "user_app") -}}
 {{-         $method = "user_app" -}}
-{{-       else if get $p "script" -}}
+{{-       else if $script -}}
 {{-         $method = "script" -}}
 {{-       end -}}
 {{-     else if eq $os "windows" -}}
@@ -68,13 +74,13 @@
 {{-         $method = "winget_user" -}}
 {{-       else if hasKey $p "scoop" -}}
 {{-         $method = "scoop" -}}
-{{-       else if get $p "script" -}}
+{{-       else if $script -}}
 {{-         $method = "script" -}}
 {{-       end -}}
 {{-     else -}}
 {{-       if and $admin (hasKey $p "apt") -}}
 {{-         $method = "apt" -}}
-{{-       else if get $p "script" -}}
+{{-       else if $script -}}
 {{-         $method = "script" -}}
 {{-       end -}}
 {{-     end -}}

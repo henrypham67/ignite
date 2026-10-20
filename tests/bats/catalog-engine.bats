@@ -50,6 +50,23 @@ problems() {
   [[ "$stderr" == *'- maconly: no install source for windows'* ]]
 }
 
+@test "validator: script limited to a platform list is not a source elsewhere" {
+  with_catalog "$FIXTURES/catalogs/script-list.yaml"
+  select_for darwin-admin
+  [ "$status" -ne 0 ]
+  [[ "$stderr" == *'- linuxonly: no install source for windows'* ]]
+  [[ "$stderr" != *'- linuxonly: no install source for linux'* ]]
+  [ "$(problems)" -eq 1 ]
+}
+
+@test "selection: script list only applies on its platforms" {
+  with_catalog "$FIXTURES/catalogs/valid.yaml"
+  select_for linux-admin
+  [ "$(method editor-helper)" = script ]
+  select_for darwin-noadmin
+  [ "$(method editor-helper)" = needs_it ]
+}
+
 @test "validator: requires chain fails" {
   with_catalog "$FIXTURES/catalogs/bad-requires.yaml"
   select_for darwin-admin

@@ -1,0 +1,6 @@
+packages:
+  linuxonly:
+    job: thing
+    group: core
+    platforms: [linux, windows]
+    script: [linux]

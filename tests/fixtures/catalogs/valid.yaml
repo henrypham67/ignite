@@ -113,6 +113,12 @@ packages:
     job: kube_context_switch
     group: core
     krew: ctx
+  editor-helper:
+    job: editor_helper
+    group: core
+    platforms: [darwin, linux]
+    cask: editor-helper
+    script: [linux]
   hashicorp.terraform:
     job: terraform_lang
     group: core
