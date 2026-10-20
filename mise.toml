@@ -23,4 +23,5 @@ description = "shellcheck the shell scripts; PSScriptAnalyzer the PowerShell scr
 run = [
   "shellcheck scripts/*.sh .githooks/pre-commit tests/bats/helper.bash",
   "pwsh -NoLogo -NoProfile -File scripts/lint-powershell.ps1",
+  "scripts/lint-rendered.sh",
 ]
