@@ -1,0 +1,22 @@
+# Dev tools for working on ignite itself (not what ignite installs on a laptop).
+[tools]
+chezmoi = "latest"
+bats = "latest"
+shellcheck = "latest"
+gitleaks = "latest"
+powershell = "latest"
+
+[tasks.test]
+description = "Run the bats test suite"
+run = "bats --recursive tests/bats"
+
+[tasks.pester]
+description = "Run the Pester test suite"
+run = "pwsh -NoLogo -NoProfile -Command 'Invoke-Pester -Path tests/pester -CI'"
+
+[tasks.lint]
+description = "shellcheck the shell scripts; PSScriptAnalyzer the PowerShell scripts"
+run = [
+  "shellcheck scripts/*.sh .githooks/pre-commit tests/bats/helper.bash",
+  "pwsh -NoLogo -NoProfile -File scripts/lint-powershell.ps1",
+]

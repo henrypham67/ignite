@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Repo-local pre-commit hook (enabled with: git config core.hooksPath .githooks).
+# core.hooksPath replaces the global ~/.git-hooks for this repo, so the global
+# Claude-file check is repeated here.
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+blocked=$(git diff --cached --name-only --diff-filter=AM | grep -E '(^|/)(CLAUDE\.md$|\.claude/)' || true)
+if [ -n "$blocked" ]; then
+  printf 'Refusing to commit Claude-local files:\n%s\n' "$blocked" >&2
+  printf '\nUnstage with: git restore --staged <file>\n' >&2
+  exit 1
+fi
+
+if ! command -v mise >/dev/null 2>&1; then
+  echo "pre-commit: mise not found; install it to run gitleaks and the catalog check" >&2
+  exit 1
+fi
+
+mise exec -- gitleaks git --pre-commit --staged --redact --no-banner .
+
+scripts/check-denylist.sh
+
+if [ -f home/.chezmoitemplates/validate-catalog ]; then
+  mise run validate
+fi
