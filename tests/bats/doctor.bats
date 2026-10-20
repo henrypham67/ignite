@@ -86,7 +86,32 @@ doctor() {
   doctor
   [ "$status" -eq 1 ]
   [[ "$output" == *"Failed installs"*"k9s"*"set GITHUB_TOKEN and retry"* ]]
-  [[ "$output" == *"chezmoi state delete-bucket --bucket=scriptState && chezmoi apply"* ]]
+  grep -qF "chezmoi state delete --bucket=entryState --key='$HOME/.chezmoiscripts/20-mise.sh'" <<< "$output"
+  grep -qx '    chezmoi apply' <<< "$output"
+  [[ "$output" != *delete-bucket* ]]
+}
+
+@test "doctor: retry re-runs exactly the script that failed" {
+  install_everything darwin-admin
+  printf 'mise\tfailed\tk9s\tboom\nbrew\tfailed\tghostty\tboom\n' > "$REPORT"
+  doctor
+  keys=$(grep -o "key='[^']*'" <<< "$output" | sed "s/key='//; s/'\$//")
+  [ "$(wc -l <<< "$keys" | tr -d ' ')" -eq 2 ]
+  # The printed keys really re-run those onchange scripts in chezmoi.
+  sandbox="$BATS_TEST_TMPDIR/sandbox"
+  mkdir -p "$sandbox/src/home/.chezmoiscripts"
+  printf 'home\n' > "$sandbox/src/.chezmoiroot"
+  for name in 20-mise 10-brew 50-krew; do
+    printf '#!/bin/sh\necho %s >> "$HOME/runs"\n' "$name" > "$sandbox/src/home/.chezmoiscripts/run_onchange_after_$name.sh"
+  done
+  : > "$sandbox/c.toml"
+  sbx() { chezmoi --source "$sandbox/src" --destination "$HOME" --config "$sandbox/c.toml" \
+    --persistent-state "$sandbox/state.db" --cache "$sandbox/cache" "$@"; }
+  sbx apply
+  : > "$HOME/runs"
+  while read -r key; do sbx state delete --bucket=entryState --key="$key"; done <<< "$keys"
+  sbx apply
+  [ "$(sort "$HOME/runs" | tr '\n' ' ')" = "10-brew 20-mise " ]
 }
 
 @test "doctor: skipped entries don't count as missing" {

@@ -33,6 +33,18 @@ Describe 'ignite-doctor.ps1' {
         Should -Invoke Write-Host -ParameterFilter { "$Object" -match '^\s+MISSING\s+k9s' }
     }
 
+    It 'failed rows print a retry that re-runs only the failed scripts' {
+        Mock Test-IgniteCheck { $true }
+        Mock Test-IgniteAlternative { $false }
+        Set-Content -LiteralPath $Report -Value @("mise`tfailed`tk9s`tboom", "scoop`tfailed`tawscli`tboom")
+        Invoke-IgniteDoctor | Out-Null
+        $root = ($HOME -replace '\\', '/')
+        Should -Invoke Write-Host -ParameterFilter { "$Object" -eq "    chezmoi state delete --bucket=entryState --key='$root/.chezmoiscripts/20-mise.ps1'" }
+        Should -Invoke Write-Host -ParameterFilter { "$Object" -eq "    chezmoi state delete --bucket=entryState --key='$root/.chezmoiscripts/25-scoop.ps1'" }
+        Should -Invoke Write-Host -ParameterFilter { "$Object" -eq '    chezmoi apply' }
+        Should -Invoke Write-Host -Times 0 -ParameterFilter { "$Object" -match 'delete-bucket' }
+    }
+
     It 'needs-it row is listed and not counted missing' {
         Mock Test-IgniteCheck { $Value -ne 'rdctl' }
         Mock Test-IgniteAlternative { $false }

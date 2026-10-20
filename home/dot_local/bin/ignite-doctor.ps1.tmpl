@@ -197,7 +197,21 @@ function Invoke-IgniteDoctor {
         Write-Host ''
         Write-Host 'Failed installs'
         $failed | ForEach-Object { Write-Host "  $($_.Item) ($($_.Source)): $($_.Detail)" }
-        Write-Host '  Retry: chezmoi state delete-bucket --bucket=scriptState; chezmoi apply'
+        Write-Host '  Retry (re-runs only the steps that failed):'
+        $scripts = @'
+{{ includeTemplate "retry-scripts.json" . | trim }}
+'@ | ConvertFrom-Json
+        $root = $HOME -replace '\\', '/'
+        foreach ($source in @($failed | ForEach-Object Source | Sort-Object -Unique)) {
+            $script = $scripts.$source
+            if ($script) {
+                Write-Host "    chezmoi state delete --bucket=entryState --key='$root/.chezmoiscripts/$script.ps1'"
+            }
+            elseif ($source -eq 'bootstrap') {
+                Write-Host '    (bootstrap steps: run the bootstrap one-liner again)'
+            }
+        }
+        Write-Host '    chezmoi apply'
     }
 
     $steps = @(Get-IgniteManualStep)

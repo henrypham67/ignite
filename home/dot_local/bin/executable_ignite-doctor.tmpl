@@ -117,11 +117,29 @@ skipped=$(awk -F '\t' '$2 == "skipped" { printf "  %s: %s\n", $3, $4 }' "$REPORT
 if [ -n "$skipped" ]; then
   printf '\nSkipped\n%s\n' "$skipped"
 fi
+# retry_script <report source>: the chezmoi script that installs that source.
+retry_script() {
+  case "$1" in
+{{- range $source, $script := includeTemplate "retry-scripts.json" . | fromJson }}
+    {{ $source }}) echo {{ $script }} ;;
+{{- end }}
+  esac
+}
+
 failed=$(awk -F '\t' '$2 == "failed" { n++ } END { print n + 0 }' "$REPORT")
 if [ "$failed" -gt 0 ]; then
   printf '\nFailed installs\n'
   awk -F '\t' '$2 == "failed" { printf "  %s (%s): %s\n", $3, $1, $4 }' "$REPORT"
-  printf '  Retry: chezmoi state delete-bucket --bucket=scriptState && chezmoi apply\n'
+  printf '  Retry (re-runs only the steps that failed):\n'
+  while IFS= read -r source; do
+    script=$(retry_script "$source")
+    if [ -n "$script" ]; then
+      printf "    chezmoi state delete --bucket=entryState --key='%s/.chezmoiscripts/%s.sh'\n" "$HOME" "$script"
+    elif [ "$source" = bootstrap ]; then
+      printf '    (bootstrap steps: run the bootstrap one-liner again)\n'
+    fi
+  done < <(awk -F '\t' '$2 == "failed" { print $1 }' "$REPORT" | sort -u)
+  printf '    chezmoi apply\n'
 fi
 
 steps=""

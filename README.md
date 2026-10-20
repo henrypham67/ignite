@@ -18,7 +18,7 @@ irm https://raw.githubusercontent.com/henrypham67/ignite/main/bootstrap.ps1 | ie
 
 It asks a few questions (work email, company git host, which clouds, whether Docker Desktop is licensed, optional tool groups), installs everything, then runs `ignite-doctor`. The doctor lists what's installed, what's missing, and what's left to do by hand: sign-ins, adding the SSH key, filling in secrets. On Windows it also prints the one-liner to run inside Ubuntu once WSL is up.
 
-Running it again is safe. It only adds or updates things, and never uninstalls.
+Running it again is safe. It only adds or updates things, and never uninstalls. On the first run, any file it's about to replace (a `.zshrc` or `.gitconfig` from the company image, say) is copied to `~/.config/ignite/backup-<time>/` first. After that, chezmoi asks before overwriting a file you've changed.
 
 ## With or without admin
 
@@ -42,7 +42,7 @@ Without admin, everything that can be installed per user still gets installed. C
 
 - Check the machine with `ignite-doctor` (`ignite-doctor.ps1` on Windows).
 - Pull changes with `chezmoi update`.
-- Retry failed installs with `chezmoi state delete-bucket --bucket=scriptState && chezmoi apply`.
+- Retry failed installs with the commands the doctor prints under "Failed installs". They reset only the install steps that failed, then run `chezmoi apply`.
 - To switch a tool, run `chezmoi edit-config`, set it under `[data.ignite.choices]` (for example `editor = "zed"`), then run `chezmoi apply`. The jobs and their options are in `home/.chezmoidata/choices.yaml`. The old tool stays installed and the doctor lists it as a duplicate.
 - Secrets go in `~/.config/ignite/secrets.env` (`secrets.ps1` on Windows). The file starts out with the expected names, only you can read it, your shell loads it, and it's never committed.
 - Settings for one machine only go in `~/.zshrc.local`, `~/.bashrc.local`, `~/.gitconfig.local`, `~/.ssh/config.local` or `~/.config/powershell/profile.local.ps1`, which are loaded if they exist.
