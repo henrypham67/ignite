@@ -8,8 +8,13 @@ $env:PATH = (Join-Path $HOME '.krew/bin') + [IO.Path]::PathSeparator + $env:PATH
 
 if (Get-Module -ListAvailable -Name PSReadLine) {
     # Without a real console (scripts, CI, some editor terminals) PSReadLine
-    # warns that ListView is unavailable on every start; stay quiet there.
-    Set-PSReadLineOption -EditMode Emacs -PredictionSource History -PredictionViewStyle ListView -WarningAction SilentlyContinue
+    # warns, or on Windows fails, on every start; stay quiet there.
+    try {
+        Set-PSReadLineOption -EditMode Emacs -PredictionSource History -PredictionViewStyle ListView -WarningAction SilentlyContinue -ErrorAction Stop
+    }
+    catch {
+        Write-Verbose "PSReadLine options not applied: $($_.Exception.Message)"
+    }
 }
 
 if (Get-Command mise -ErrorAction SilentlyContinue) {
@@ -36,7 +41,7 @@ $env:GITLAB_URL = {{ .ignite.gitlab_url | squote }}
 # would win over functions, so they go first.
 {{- range $alias, $def := .aliases }}
 Remove-Alias -Name {{ $alias }} -Force -ErrorAction SilentlyContinue
-function {{ $alias }} { {{ $def.cmd }} @args }
+function {{ $alias }} { {{ get $def "windows" | default $def.cmd }} @args }
 {{- end }}
 
 $igniteLocal = Join-Path $HOME '.config/powershell/profile.local.ps1'

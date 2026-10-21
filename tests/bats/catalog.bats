@@ -70,6 +70,18 @@ method() {
   [ "$(method rancher-desktop)" != absent ]
 }
 
+@test "catalog: krew's ctx, ns and neat stay off Windows; kubectx and kubens stand in" {
+  select_for windows-admin
+  [ "$(method krew-ctx)" = absent ]
+  [ "$(method krew-ns)" = absent ]
+  [ "$(method krew-neat)" = absent ]
+  [ "$(method kubectx)" = mise ]
+  [ "$(method kubens)" = mise ]
+  select_for darwin-admin
+  [ "$(method krew-ctx)" = krew ]
+  [ "$(method kubectx)" = absent ]
+}
+
 @test "catalog: direnv comes from Scoop on Windows (aqua has no Windows build)" {
   for fixture in windows-admin windows-noadmin; do
     select_for "$fixture"

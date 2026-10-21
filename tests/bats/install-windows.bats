@@ -58,7 +58,9 @@ is_empty() {
 }
 
 @test "windows: krew, scripts and vscode-ext render for windows-admin" {
-  grep -qx "Install-IgniteKrew -Name 'krew-ctx' -Plugin 'ctx'" "$(render_script windows-admin run_onchange_after_50-krew.ps1.tmpl)"
+  krew=$(render_script windows-admin run_onchange_after_50-krew.ps1.tmpl)
+  grep -qx "Install-IgniteKrew -Name 'krew-view-secret' -Plugin 'view-secret'" "$krew"
+  ! grep -q "'ctx'" "$krew"
   scripts=$(render_script windows-admin run_onchange_after_40-scripts.ps1.tmpl)
   grep -q "Invoke-IgniteTry -Source script -Item 'claude-code'" "$scripts"
   grep -q "Invoke-IgniteTry -Source script -Item 'hack-nerd-font'" "$scripts"

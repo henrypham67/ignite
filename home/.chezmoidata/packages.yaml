@@ -287,21 +287,36 @@ packages:
     group: core
     mise: krew
     bin: kubectl-krew
+  # krew offers no Windows builds of ctx, ns or neat; kubectx and kubens
+  # (their standalone binaries) do the same jobs there.
   krew-ctx:
     job: kube_context_switch
     group: core
+    platforms: [darwin, linux, wsl]
     krew: ctx
     requires: krew
   krew-ns:
     job: kube_namespace_switch
     group: core
+    platforms: [darwin, linux, wsl]
     krew: ns
     requires: krew
   krew-neat:
     job: kube_manifest_clean
     group: core
+    platforms: [darwin, linux, wsl]
     krew: neat
     requires: krew
+  kubectx:
+    job: kube_context_switch
+    group: core
+    platforms: [windows]
+    mise: kubectx
+  kubens:
+    job: kube_namespace_switch
+    group: core
+    platforms: [windows]
+    mise: kubens
   krew-view-secret:
     job: kube_secret_view
     group: core

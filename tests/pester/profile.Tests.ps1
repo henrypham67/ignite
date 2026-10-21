@@ -63,6 +63,22 @@ Describe 'PowerShell profile and Windows Terminal' {
             $out[2] | Should -Be 'Function'
         }
 
+        It 'kctx and kns use kubectx and kubens on Windows (krew has no Windows ctx/ns)' {
+            $out = & $Pwsh -NoLogo -NoProfile -Command ". '$Profile'; (Get-Command kctx).Definition.Trim(); (Get-Command kns).Definition.Trim()" 2>&1
+            $out[-2] | Should -Be 'kubectx @args'
+            $out[-1] | Should -Be 'kubens @args'
+        }
+
+        It 'loads quietly when PSReadLine can''t set up the console (<Case>)' -ForEach @(
+            @{ Case = 'error'; Stub = "Write-Error 'The handle is invalid.'" }
+            @{ Case = 'throw'; Stub = "throw 'The handle is invalid.'" }
+        ) {
+            $stub = "function Set-PSReadLineOption { [CmdletBinding()] param([Parameter(ValueFromRemainingArguments)]`$Rest) $Stub }"
+            $out = @(& $Pwsh -NoLogo -NoProfile -Command "$stub; . '$Profile'; 'loaded'" 2>&1)
+            ($out | ForEach-Object { "$_" }) -join "`n" | Should -Not -Match 'handle is invalid'
+            "$($out[-1])" | Should -Be 'loaded'
+        }
+
         It 'puts krew plugins on PATH, so kubectl finds kubectl-krew' {
             $saved = $env:PATH
             try {
