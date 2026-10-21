@@ -257,8 +257,10 @@ function Test-IgniteWsl {
     if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) { return $false }
     $ErrorActionPreference = 'Continue'
     try {
+        # The exit code, not $?: under 5.1, redirected stderr can make $? false
+        # even when wsl.exe succeeded.
         & wsl.exe --status *> $null
-        return ($? -and $LASTEXITCODE -eq 0)
+        return ($LASTEXITCODE -eq 0)
     }
     catch { return $false }
 }

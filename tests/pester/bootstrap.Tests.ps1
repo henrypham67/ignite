@@ -149,7 +149,8 @@ Describe 'bootstrap.ps1' {
 
     Context 'Test-IgniteWsl' {
         It 'returns false instead of throwing when wsl.exe writes an error' {
-            function global:wsl.exe { Write-Error 'WSL is not enabled' }
+            # Like the real wsl.exe without WSL: an error, and a non-zero exit code.
+            function global:wsl.exe { $global:LASTEXITCODE = 1; Write-Error 'WSL is not enabled' }
             try {
                 Mock Get-Command { [pscustomobject]@{ Name = 'wsl.exe' } } -ParameterFilter { $Name -eq 'wsl.exe' }
                 $ErrorActionPreference = 'Stop'

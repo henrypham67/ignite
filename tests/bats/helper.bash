@@ -44,6 +44,12 @@ render_init() {
     execute-template --init --no-tty "$@" < "$template"
 }
 
+# mode_of <path>: octal permissions, on GNU (Linux) and BSD (macOS) stat.
+# GNU first: GNU `stat -f` means "filesystem", so it would succeed wrongly.
+mode_of() {
+  stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"
+}
+
 # managed <fixture>: list the targets chezmoi manages for a fixture machine.
 # Runs on a copy of the source without .chezmoiexternal.toml.tmpl: chezmoi
 # would otherwise download every external archive just to list targets.

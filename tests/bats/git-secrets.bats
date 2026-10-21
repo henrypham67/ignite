@@ -98,7 +98,7 @@ get() {
   bash "$BATS_TEST_TMPDIR/ssh-key.sh"
   [ -f "$HOME/.ssh/id_ed25519" ]
   grep -q 'ci@example.com' "$HOME/.ssh/id_ed25519.pub"
-  [ "$(stat -f %Lp "$HOME/.ssh" 2>/dev/null || stat -c %a "$HOME/.ssh")" = 700 ]
+  [ "$(mode_of "$HOME/.ssh")" = 700 ]
   before=$(shasum "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ed25519.pub")
   bash "$BATS_TEST_TMPDIR/ssh-key.sh"
   [ "$(shasum "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ed25519.pub")" = "$before" ]
@@ -112,7 +112,7 @@ secrets_script() {
 @test "secrets: creates file with mode 600 and empty names" {
   bash "$(secrets_script linux-admin)"
   file="$HOME/.config/ignite/secrets.env"
-  [ "$(stat -f %Lp "$file" 2>/dev/null || stat -c %a "$file")" = 600 ]
+  [ "$(mode_of "$file")" = 600 ]
   grep -qx 'GITLAB_PRIVATE_TOKEN=' "$file"
   grep -qx 'GITLAB_USERNAME=' "$file"
 }

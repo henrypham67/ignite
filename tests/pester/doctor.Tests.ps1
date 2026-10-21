@@ -18,6 +18,9 @@ Describe 'ignite-doctor.ps1' {
         Mock Get-IgniteManualStep { @() }
         Mock Get-IgniteVersion { '9.9.9' }
         Mock Write-Host {}
+        # On Windows the real one rebuilds PATH from the registry, which would
+        # drop chezmoi (added by CI) for every test file that runs after this.
+        Mock Update-IgnitePath {}
     }
 
     It 'all present exits 0' {
