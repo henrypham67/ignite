@@ -14,6 +14,13 @@ function Install-IgniteKrew {
     Invoke-IgniteTry -Source krew -Item $Name -ScriptBlock { kubectl krew install $Plugin }.GetNewClosure()
 }
 
+# mise installs krew as plain `krew`; kubectl only finds plugins named
+# kubectl-*, so let krew install itself into ~/.krew/bin (as krew's own
+# installer does).
+if (-not (Get-Command kubectl-krew -ErrorAction SilentlyContinue)) {
+    Invoke-IgniteTry -Source krew -Item krew -ScriptBlock { krew install krew }
+    Update-IgnitePath
+}
 Invoke-IgniteTry -Source krew -Item krew-index -ScriptBlock { kubectl krew update }
 {{- range $name := $items }}
 Install-IgniteKrew -Name '{{ $name }}' -Plugin '{{ (get $selected $name).krew }}'

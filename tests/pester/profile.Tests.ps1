@@ -63,6 +63,16 @@ Describe 'PowerShell profile and Windows Terminal' {
             $out[2] | Should -Be 'Function'
         }
 
+        It 'puts krew plugins on PATH, so kubectl finds kubectl-krew' {
+            $saved = $env:PATH
+            try {
+                $env:PATH = '/usr/bin' + [IO.Path]::PathSeparator + '/bin'
+                $out = & $Pwsh -NoLogo -NoProfile -Command ". '$Profile'; `$env:PATH" 2>&1
+            }
+            finally { $env:PATH = $saved }
+            ($out -join "`n") | Should -Match '\.krew[\\/]bin'
+        }
+
         It 'loads secrets and completions from their folders' {
             Get-Content -Raw -LiteralPath $Profile | Should -Match 'secrets\.ps1'
             Get-Content -Raw -LiteralPath $Profile | Should -Match '\.cache.ignite.completions'

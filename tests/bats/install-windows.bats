@@ -46,6 +46,17 @@ is_empty() {
   ! grep -qx awscli <<< "$items"
 }
 
+@test "windows: krew installs itself as a kubectl plugin before the plugins" {
+  script=$(render_script windows-admin run_onchange_after_50-krew.ps1.tmpl)
+  self=$(grep -n 'krew install krew' "$script" | head -n 1 | cut -d: -f1)
+  update=$(grep -n 'kubectl krew update' "$script" | head -n 1 | cut -d: -f1)
+  [ -n "$self" ] && [ "$self" -lt "$update" ]
+}
+
+@test "windows: VS Code extensions get a second try" {
+  grep -q -- '-Attempts 2' "$(render_script windows-admin run_onchange_after_60-vscode-ext.ps1.tmpl)"
+}
+
 @test "windows: krew, scripts and vscode-ext render for windows-admin" {
   grep -qx "Install-IgniteKrew -Name 'krew-ctx' -Plugin 'ctx'" "$(render_script windows-admin run_onchange_after_50-krew.ps1.tmpl)"
   scripts=$(render_script windows-admin run_onchange_after_40-scripts.ps1.tmpl)

@@ -3,6 +3,9 @@
 # file through a one-line shim, so OneDrive-redirected Documents don't matter.
 # Machine-only additions go in ~/.config/powershell/profile.local.ps1.
 
+# kubectl plugins installed by krew (kubectl-krew, kubectl-ctx, ...).
+$env:PATH = (Join-Path $HOME '.krew/bin') + [IO.Path]::PathSeparator + $env:PATH
+
 if (Get-Module -ListAvailable -Name PSReadLine) {
     # Without a real console (scripts, CI, some editor terminals) PSReadLine
     # warns that ListView is unavailable on every start; stay quiet there.

@@ -37,6 +37,6 @@ if [ -z "$ig_code" ]; then
 fi
 
 for ext in "${extensions[@]}"; do
-  ig_try vscode-ext "$ext" "$ig_code" --install-extension "$ext"
+  ig_try vscode-ext "$ext" ig_retry 2 "$ig_code" --install-extension "$ext"
 done
 {{ end -}}

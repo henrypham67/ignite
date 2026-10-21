@@ -49,28 +49,37 @@ function Invoke-IgniteTry {
     param(
         [Parameter(Mandatory)][string]$Source,
         [Parameter(Mandatory)][string]$Item,
-        [Parameter(Mandatory)][scriptblock]$ScriptBlock
+        [Parameter(Mandatory)][scriptblock]$ScriptBlock,
+        # More than 1 for steps that fail on a passing network blip; waits
+        # IG_RETRY_DELAY seconds (default 5) between tries.
+        [int]$Attempts = 1
     )
     if (Test-IgniteSkipped -Item $Item) {
         Add-IgniteReport -Source $Source -Status skipped -Item $Item -Detail 'IGNITE_SKIP'
         return
     }
     Write-Host "==> ignite ${Source}: $Item"
-    $lines = [System.Collections.Generic.List[string]]::new()
-    $failed = $false
     $ErrorActionPreference = 'Stop'
-    try {
-        $global:LASTEXITCODE = 0
-        & $ScriptBlock 2>&1 | ForEach-Object {
-            $text = "$_"
-            $lines.Add($text)
-            Write-Host $text
+    $delay = 5
+    if ($env:IG_RETRY_DELAY) { $delay = [int]$env:IG_RETRY_DELAY }
+    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+        $lines = [System.Collections.Generic.List[string]]::new()
+        $failed = $false
+        try {
+            $global:LASTEXITCODE = 0
+            & $ScriptBlock 2>&1 | ForEach-Object {
+                $text = "$_"
+                $lines.Add($text)
+                Write-Host $text
+            }
+            if ($LASTEXITCODE -ne 0) { $failed = $true }
         }
-        if ($LASTEXITCODE -ne 0) { $failed = $true }
-    }
-    catch {
-        $failed = $true
-        $lines.Add($_.Exception.Message)
+        catch {
+            $failed = $true
+            $lines.Add($_.Exception.Message)
+        }
+        if (-not $failed) { return }
+        if ($attempt -lt $Attempts) { Start-Sleep -Seconds $delay }
     }
     if ($failed) {
         $detail = $lines | Where-Object { $_ -match '\S' } | Select-Object -Last 1

@@ -106,6 +106,18 @@ rows() {
   [[ ":$path:" == *":$BATS_TEST_TMPDIR/h/.krew/bin:"* ]]
 }
 
+@test "lib.sh: ig_retry tries again after a failure, and gives up after the limit" {
+  . "$LIB"
+  counter="$BATS_TEST_TMPDIR/count"
+  flaky() { echo x >> "$counter"; [ "$(wc -l < "$counter")" -ge 2 ]; }
+  IG_RETRY_DELAY=0 run ig_retry 2 flaky
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$counter" | tr -d ' ')" -eq 2 ]
+  rm -f "$counter"
+  IG_RETRY_DELAY=0 run ig_retry 3 false
+  [ "$status" -ne 0 ]
+}
+
 @test "lib.sh: ig_sudo runs through sudo, or directly as root" {
   stubs="$BATS_TEST_TMPDIR/stubs"
   mkdir -p "$stubs"

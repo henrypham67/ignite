@@ -67,6 +67,19 @@ ig_try() {
   return 0
 }
 
+# ig_retry <attempts> <cmd...>: run cmd until it succeeds, at most <attempts>
+# times, waiting IG_RETRY_DELAY seconds (default 5) in between. For steps that
+# fail on a passing network blip (the VS Code marketplace returning 503).
+ig_retry() {
+  local attempts=$1 n=1
+  shift
+  until "$@"; do
+    [ "$n" -lt "$attempts" ] || return 1
+    n=$((n + 1))
+    sleep "${IG_RETRY_DELAY:-5}"
+  done
+}
+
 # ig_sudo <cmd...>: run as root; plain when already root (containers).
 ig_sudo() {
   if [ "$(id -u)" = 0 ]; then

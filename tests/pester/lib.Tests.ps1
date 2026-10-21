@@ -31,6 +31,20 @@ Describe 'lib.ps1' {
         Get-Content -LiteralPath $Report | Should -Be "winget`tfailed`tgit`tlast"
     }
 
+    It 'Invoke-IgniteTry -Attempts retries a step that fails once' {
+        $script:tries = 0
+        $env:IG_RETRY_DELAY = '0'
+        try {
+            Invoke-IgniteTry -Source vscode-ext -Item helm -Attempts 2 -ScriptBlock {
+                $script:tries++
+                if ($script:tries -lt 2) { throw 'Server returned 503' }
+            }
+        }
+        finally { $env:IG_RETRY_DELAY = $null }
+        $script:tries | Should -Be 2
+        Test-Path -LiteralPath $Report | Should -BeFalse
+    }
+
     It 'Invoke-IgniteTry success writes no row' {
         Invoke-IgniteTry -Source mise -Item jq -ScriptBlock { Write-Output 'fine' }
         Test-Path -LiteralPath $Report | Should -BeFalse

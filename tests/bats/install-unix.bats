@@ -17,7 +17,7 @@ setup() {
   unset IGNITE_SKIP
   # Guard: anything that installs software fails loudly unless a test stubs it
   # on purpose. These rendered scripts must never reach the real tools.
-  for tool in brew mise kubectl code apt-get sudo curl snap hdiutil wget; do
+  for tool in brew mise kubectl krew code apt-get sudo curl snap hdiutil wget; do
     stub "$tool" "echo 'unexpected call: $tool' >&2; exit 97"
   done
 }
@@ -196,16 +196,38 @@ fixture_with_choice() {
   [ "$(grep -c 'VS Code CLI not found' "$REPORT")" -gt 10 ]
 }
 
-@test "install: krew updates once then installs each plugin" {
+@test "install: krew installs itself as a kubectl plugin, then the plugins" {
   script=$(render_script darwin-admin run_onchange_after_50-krew.sh.tmpl)
   stub kubectl
+  # mise installs krew as plain `krew`; kubectl only finds `kubectl-krew`.
+  stub krew
   run_script "$script"
   [ "$status" -eq 0 ]
-  [ "$(head -n 1 "$CALLS")" = "kubectl krew update" ]
+  [ "$(sed -n 1p "$CALLS")" = "krew install krew" ]
+  [ "$(sed -n 2p "$CALLS")" = "kubectl krew update" ]
   for plugin in ctx ns neat view-secret; do
     grep -qx "kubectl krew install $plugin" "$CALLS"
   done
   ! grep -q cnpg "$CALLS"
+}
+
+@test "install: krew skips self-install when kubectl-krew is already there" {
+  script=$(render_script darwin-admin run_onchange_after_50-krew.sh.tmpl)
+  stub kubectl
+  stub kubectl-krew
+  run_script "$script"
+  [ "$status" -eq 0 ]
+  ! grep -q '^krew install krew' "$CALLS"
+  [ "$(sed -n 1p "$CALLS")" = "kubectl krew update" ]
+}
+
+@test "install: a VS Code extension that fails once (marketplace 503) is retried" {
+  script=$(render_script darwin-admin run_onchange_after_60-vscode-ext.sh.tmpl)
+  stub code "case \"\$*\" in *helm-intellisense*) if [ ! -f '$BATS_TEST_TMPDIR/tried' ]; then touch '$BATS_TEST_TMPDIR/tried'; echo 'Server returned 503'; exit 1; fi ;; esac; exit 0"
+  IG_CODE_SEARCH="" IG_RETRY_DELAY=0 run_script "$script"
+  [ "$status" -eq 0 ]
+  [ "$(grep -c 'install-extension tim-koehler.helm-intellisense' "$CALLS")" -eq 2 ]
+  ! grep -q 'helm-intellisense' "$REPORT" 2>/dev/null
 }
 
 @test "install: script entries run as functions, admin-only ones in 15" {

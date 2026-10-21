@@ -10,6 +10,12 @@ set -uo pipefail
 {{ template "lib.sh" . }}
 ig_path_setup
 ig_reset krew
+# mise installs krew as plain `krew`; kubectl only finds plugins named
+# kubectl-*, so let krew install itself into ~/.krew/bin (as krew's own
+# installer does).
+if ! command -v kubectl-krew >/dev/null 2>&1; then
+  ig_try krew krew krew install krew
+fi
 ig_try krew krew-index kubectl krew update
 {{- range $name := $items }}
 ig_try krew {{ $name }} kubectl krew install {{ (get $selected $name).krew }}

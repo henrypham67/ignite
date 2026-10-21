@@ -29,6 +29,7 @@ foreach ($extension in $extensions) {
         Add-IgniteReport -Source vscode-ext -Status failed -Item $extension -Detail 'VS Code CLI not found'
         continue
     }
-    Invoke-IgniteTry -Source vscode-ext -Item $extension -ScriptBlock { & $code --install-extension $extension }.GetNewClosure()
+    # Two tries: the marketplace sometimes answers 503 for a moment.
+    Invoke-IgniteTry -Source vscode-ext -Item $extension -Attempts 2 -ScriptBlock { & $code --install-extension $extension }.GetNewClosure()
 }
 {{ end -}}
