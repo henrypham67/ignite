@@ -56,13 +56,20 @@ jobs:
         with:
           install: false
       - name: Install chezmoi
-        run: mise install chezmoi
+        shell: pwsh
+        # `mise exec chezmoi -- pwsh ...` doesn't make chezmoi visible to the
+        # child pwsh on Windows, so put its directory on the job's PATH.
+        run: |
+          mise install chezmoi
+          Split-Path -Parent (mise which chezmoi) | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
       - name: Install Pester
         shell: pwsh
         run: Install-Module Pester -MinimumVersion 5.5 -Scope CurrentUser -Force -SkipPublisherCheck
       - name: Pester
         shell: pwsh
-        run: mise exec chezmoi -- pwsh -NoLogo -NoProfile -Command 'Invoke-Pester -Path tests/pester -CI'
+        run: |
+          chezmoi --version
+          Invoke-Pester -Path tests/pester -CI
 
   e2e:
     strategy:

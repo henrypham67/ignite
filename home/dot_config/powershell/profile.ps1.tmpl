@@ -4,7 +4,9 @@
 # Machine-only additions go in ~/.config/powershell/profile.local.ps1.
 
 if (Get-Module -ListAvailable -Name PSReadLine) {
-    Set-PSReadLineOption -EditMode Emacs -PredictionSource History -PredictionViewStyle ListView
+    # Without a real console (scripts, CI, some editor terminals) PSReadLine
+    # warns that ListView is unavailable on every start; stay quiet there.
+    Set-PSReadLineOption -EditMode Emacs -PredictionSource History -PredictionViewStyle ListView -WarningAction SilentlyContinue
 }
 
 if (Get-Command mise -ErrorAction SilentlyContinue) {

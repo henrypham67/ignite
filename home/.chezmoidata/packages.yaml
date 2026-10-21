@@ -356,6 +356,8 @@ packages:
     job: per_directory_env
     group: core
     mise: direnv
+    mise_skip: [windows]   # aqua has no Windows build of direnv
+    scoop: main/direnv
   zoxide:
     job: smart_cd
     group: core

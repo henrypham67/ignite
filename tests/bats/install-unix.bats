@@ -120,6 +120,14 @@ fixture_with_choice() {
   grep -qx '\[tools\]' <<< "$mac"
 }
 
+@test "install: mise config turns off auto-install, so one failed tool can't break every shim" {
+  for fixture in darwin-admin windows-admin linux-admin; do
+    config=$(render_file "$fixture" "$REPO/home/dot_config/mise/config.toml.tmpl")
+    grep -qx '\[settings\]' <<< "$config"
+    grep -qx 'auto_install = false' <<< "$config"
+  done
+}
+
 @test "install: mise script orders node,python,go first and npm: last" {
   fixture=$(fixture_with_choice darwin-admin ai_assistant gemini-cli)
   script=$(render_script "$fixture" run_onchange_after_20-mise.sh.tmpl)

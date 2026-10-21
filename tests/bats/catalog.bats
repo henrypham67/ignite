@@ -70,6 +70,15 @@ method() {
   [ "$(method rancher-desktop)" != absent ]
 }
 
+@test "catalog: direnv comes from Scoop on Windows (aqua has no Windows build)" {
+  for fixture in windows-admin windows-noadmin; do
+    select_for "$fixture"
+    [ "$(method direnv)" = scoop ]
+  done
+  select_for darwin-admin
+  [ "$(method direnv)" = mise ]
+}
+
 @test "catalog: windows-noadmin uses no machine-wide winget installs" {
   select_for windows-noadmin
   [ "$(jq '[.[] | select(.method == "winget")] | length' <<< "$output")" -eq 0 ]

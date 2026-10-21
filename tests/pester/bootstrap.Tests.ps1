@@ -210,6 +210,16 @@ Describe 'bootstrap.ps1' {
             $command | Should -Match 'wsl\.exe --install --no-distribution'
         }
 
+        It 'only installs git and PowerShell 7 when they are missing' {
+            # Reinstalling PowerShell 7 closes every running pwsh, including
+            # the window the bootstrap was started from.
+            $command = Get-IgniteAdminCommand -HasWinget $true -NeedsWsl $false -NeedsGit $false -NeedsPwsh $false
+            $command | Should -Not -Match 'Git\.Git'
+            $command | Should -Not -Match 'Microsoft\.PowerShell'
+            Get-IgniteAdminCommand -HasWinget $true -NeedsWsl $false -NeedsGit $false -NeedsPwsh $true |
+                Should -Match 'Microsoft\.PowerShell'
+        }
+
         It 'leaves winget out when it is missing' {
             Get-IgniteAdminCommand -HasWinget $false -NeedsWsl $true | Should -Not -Match 'winget'
         }

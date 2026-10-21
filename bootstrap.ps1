@@ -234,14 +234,16 @@ function Test-IgniteSkipped {
     return ($skip -contains $Item)
 }
 
-# The admin-only prerequisites, as one block of PowerShell for a single UAC prompt.
+# The admin-only prerequisites, as one block of PowerShell for a single UAC
+# prompt. Git and PowerShell 7 only when missing: reinstalling PowerShell 7
+# closes every running pwsh, including the window this was started from.
 function Get-IgniteAdminCommand {
-    param([bool]$HasWinget, [bool]$NeedsWsl)
+    param([bool]$HasWinget, [bool]$NeedsWsl, [bool]$NeedsGit = $true, [bool]$NeedsPwsh = $true)
     $steps = @()
     if ($HasWinget) {
         $winget = 'winget install --id {0} -e --silent --scope machine --accept-package-agreements --accept-source-agreements --disable-interactivity'
-        $steps += ($winget -f 'Git.Git')
-        $steps += ($winget -f 'Microsoft.PowerShell')
+        if ($NeedsGit) { $steps += ($winget -f 'Git.Git') }
+        if ($NeedsPwsh) { $steps += ($winget -f 'Microsoft.PowerShell') }
     }
     if ($NeedsWsl -and -not (Test-IgniteSkipped -Item 'wsl')) {
         $steps += 'wsl.exe --install --no-distribution'
@@ -274,7 +276,9 @@ function Install-IgnitePrereqs {
     }
     $elevated = $false
     if ($CanElevate) {
-        $command = Get-IgniteAdminCommand -HasWinget $hasWinget -NeedsWsl (-not $wslBefore)
+        $needsGit = -not (Get-Command git -ErrorAction SilentlyContinue)
+        $needsPwsh = -not (Get-Command pwsh -ErrorAction SilentlyContinue)
+        $command = Get-IgniteAdminCommand -HasWinget $hasWinget -NeedsWsl (-not $wslBefore) -NeedsGit $needsGit -NeedsPwsh $needsPwsh
         if ($command) {
             Write-IgniteLog 'installing admin prerequisites (one UAC prompt)'
             $elevated = Invoke-IgniteElevated -Command $command
