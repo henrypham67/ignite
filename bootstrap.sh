@@ -8,6 +8,7 @@
 #   IGNITE_CA_CERT       company root CA (PEM) for TLS-inspecting proxies
 #   IGNITE_NO_ADMIN=1    take the no-admin path even if sudo works
 #   IGNITE_SKIP          comma-separated catalog entries to skip
+#   IGNITE_NO_GUM=1      ask the setup questions as plain text (chezmoi's prompts)
 #   IGNITE_REPO, IGNITE_REF, IGNITE_LOCAL_SOURCE   where the dotfiles come from
 #
 # Runs under macOS /bin/bash 3.2: no associative arrays, mapfile or ${x,,}.
@@ -15,6 +16,9 @@ set -euo pipefail
 
 IG_BIN="$HOME/.local/bin"
 IG_CONFIG="$HOME/.config/ignite"
+IG_GUM_VERSION=2.0.2
+# Where gum reads keys from. `curl | bash` leaves stdin on the script pipe.
+IG_TTY=${IG_TTY:-/dev/tty}
 
 ig_log() {
   printf '==> ignite: %s\n' "$*"
@@ -257,6 +261,166 @@ ig_backup_targets() {
   fi
 }
 
+# ---------------------------------------------------------------- questions
+# The first run asks the setup questions with gum (arrow keys, checkboxes) and
+# hands the answers to chezmoi init as --prompt* flags. The flag keys are the
+# prompt texts in home/.chezmoi.toml.tmpl; tests/bats/bootstrap.bats renders
+# that template with these flags to catch a key that no longer matches.
+
+# ig_use_gum <first_run> <forwarded args...>: succeed when the questions should
+# be asked with gum: the first run, a terminal to ask on, no --no-tty and no
+# IGNITE_NO_GUM=1. Later runs have their answers already.
+ig_use_gum() {
+  local first_run=$1 arg
+  shift
+  [ -n "$first_run" ] || return 1
+  [ "${IGNITE_NO_GUM:-}" != 1 ] || return 1
+  for arg in "$@"; do
+    [ "$arg" != --no-tty ] || return 1
+  done
+  { : < "$IG_TTY"; } 2>/dev/null
+}
+
+# ig_install_gum: install gum with mise and print its path. Prints nothing
+# when that fails; chezmoi then asks the questions itself. Runs from $HOME, so
+# a mise.toml where the bootstrap was started can't stop it with a trust prompt.
+ig_install_gum() {
+  "$IG_BIN/mise" -C "$HOME" install "gum@$IG_GUM_VERSION" >&2 || return 0
+  "$IG_BIN/mise" -C "$HOME" which gum --tool "gum@$IG_GUM_VERSION" 2>/dev/null || true
+}
+
+# ig_pick <gum args...>: print what was picked. Ctrl-C (exit 130) or a gum
+# error stops the setup; callers add `|| exit 1`, as this runs in $(...).
+ig_pick() {
+  "$IG_GUM" "$@" < "$IG_TTY" || ig_die "setup cancelled"
+}
+
+# ig_yes <gum confirm args...>: succeed on yes, fail on no; Ctrl-C stops the setup.
+ig_yes() {
+  local rc=0
+  "$IG_GUM" confirm "$@" < "$IG_TTY" || rc=$?
+  [ "$rc" -le 1 ] || ig_die "setup cancelled"
+  return "$rc"
+}
+
+# ig_ok <value> <glob>: the value matches the glob and is safe in a chezmoi
+# --prompt* flag, which splits on commas and quotes.
+ig_ok() {
+  case "$1" in *[,\"[:space:]]*) return 1 ;; esac
+  # shellcheck disable=SC2254 # the glob is the point
+  case "$1" in $2) return 0 ;; esac
+  return 1
+}
+
+# ig_has <word> <lines>: "true" when word is one of the lines, else "false".
+ig_has() {
+  if printf '%s\n' "$2" | grep -qx "$1"; then echo true; else echo false; fi
+}
+
+# ig_group_label <group> <os>: the gum option for an optional tool group,
+# "label|value". The tools named are examples from the catalog; tests check
+# that each one is in the group and available on the OS.
+ig_group_label() {
+  case "$1:$2" in
+    specialist:*) echo "Specialist tools: vault, istioctl, cilium-cli, k6, kops, java|specialist" ;;
+    personal:darwin) echo "Personal apps: obsidian, telegram, anki, ffmpeg, yt-dlp|personal" ;;
+    personal:*) echo "Personal apps: ffmpeg, yt-dlp, hugo, imagemagick|personal" ;;
+  esac
+}
+
+# ig_choice_menu: one "job<TAB>default<TAB>options" line per tool choice this
+# machine can make, printed by the config template itself (IGNITE_CHOICE_MENU=1)
+# so the menus match what chezmoi init accepts. A remote repo is fetched first;
+# that init writes its config to a throwaway file and gets the answers so far,
+# because --promptDefaults can't answer the email (it has no default).
+ig_choice_menu() {
+  local tmp src
+  if [ -z "${IGNITE_LOCAL_SOURCE:-}" ]; then
+    tmp=$(mktemp -d)
+    if ! "$IG_BIN/chezmoi" ${IG_CHEZMOI_GLOBAL[@]+"${IG_CHEZMOI_GLOBAL[@]}"} "${IG_CHEZMOI_INIT[@]}" \
+      ${IG_ANSWERS[@]+"${IG_ANSWERS[@]}"} --promptDefaults --config-path "$tmp/chezmoi.toml" >&2; then
+      rm -rf "$tmp"
+      return 1
+    fi
+    rm -rf "$tmp"
+  fi
+  src=$("$IG_BIN/chezmoi" ${IG_CHEZMOI_GLOBAL[@]+"${IG_CHEZMOI_GLOBAL[@]}"} source-path) || return 1
+  IGNITE_CHOICE_MENU=1 "$IG_BIN/chezmoi" ${IG_CHEZMOI_GLOBAL[@]+"${IG_CHEZMOI_GLOBAL[@]}"} execute-template \
+    --init --promptBool "Change default tool choices=true" --file "$src/.chezmoi.toml.tmpl"
+}
+
+# ig_ask_choices: a radio list for each tool choice, the default preselected.
+ig_ask_choices() {
+  local menu job default options pick
+  if ! menu=$(ig_choice_menu); then
+    ig_log "could not list the tool choices; chezmoi asks them instead"
+    return 0
+  fi
+  while IFS=$'\t' read -r job default options; do
+    [ -n "$job" ] || continue
+    # shellcheck disable=SC2086 # options is a space-separated list
+    pick=$(ig_pick choose --header "Tool for: ${job//_/ }" --selected "$default" $options) || exit 1
+    IG_ANSWERS+=(--promptChoice "Choice for $job=$pick")
+  done <<EOF
+$menu
+EOF
+}
+
+# ig_ask <os>: ask the setup questions with gum and fill IG_ANSWERS with the
+# chezmoi --prompt* flags that answer them.
+ig_ask() {
+  local os=$1 email="" host url="" clouds groups licensed=false customize=false
+  IG_ANSWERS=()
+  until ig_ok "$email" '?*@?*'; do
+    email=$(ig_pick input --header "Work email for git" --placeholder "you@company.com") || exit 1
+  done
+  host=$(ig_pick choose --header "Company git host" --label-delimiter "|" \
+    "github.com|github" "Self-hosted GitLab|gitlab") || exit 1
+  IG_ANSWERS+=(--promptString "Work email for git=$email"
+    --promptChoice "Company git host: github.com or a self-hosted GitLab=$host")
+  if [ "$host" = gitlab ]; then
+    until ig_ok "$url" 'https://?*'; do
+      url=$(ig_pick input --header "Company GitLab URL (starts with https://)" \
+        --placeholder "https://gitlab.example.com") || exit 1
+    done
+    IG_ANSWERS+=(--promptString "Company GitLab URL=$url")
+  fi
+
+  clouds=$(ig_pick choose --no-limit --header "Clouds you use: x to tick, enter when done (none is fine)" --label-delimiter "|" \
+    "AWS|aws" "Azure|azure" "GCP|gcp") || exit 1
+  IG_ANSWERS+=(--promptBool "Use AWS=$(ig_has aws "$clouds")"
+    --promptBool "Use Azure=$(ig_has azure "$clouds")"
+    --promptBool "Use GCP=$(ig_has gcp "$clouds")")
+  if [ "$os" = darwin ]; then
+    if ig_yes --default=false "Does the company license Docker Desktop?"; then licensed=true; fi
+    IG_ANSWERS+=(--promptBool "Company licenses Docker Desktop=$licensed")
+  fi
+
+  groups=$(ig_pick choose --no-limit --header "Optional tool groups: x to tick, enter when done (none is fine)" --label-delimiter "|" \
+    "$(ig_group_label specialist "$os")" "$(ig_group_label personal "$os")") || exit 1
+  IG_ANSWERS+=(--promptBool "Install specialist tools=$(ig_has specialist "$groups")"
+    --promptBool "Install personal apps=$(ig_has personal "$groups")")
+
+  if ig_yes --default=false "Change the default tools (editor, terminal, prompt, ...)?"; then
+    customize=true
+    ig_ask_choices
+  fi
+  IG_ANSWERS+=(--promptBool "Change default tool choices=$customize")
+}
+
+# ig_ask_with_gum <first_run> <forwarded args...>: on a first run with a
+# terminal, ask the questions with gum and add the answers to IG_CHEZMOI_INIT.
+ig_ask_with_gum() {
+  ig_use_gum "$@" || return 0
+  IG_GUM=$(ig_install_gum)
+  if [ -z "$IG_GUM" ]; then
+    ig_log "gum is not available; chezmoi asks the questions instead"
+    return 0
+  fi
+  ig_ask "$OS"
+  IG_CHEZMOI_INIT+=("${IG_ANSWERS[@]}")
+}
+
 main() {
   OS=$(ig_detect_os)
   IGNITE_ADMIN=$(ig_detect_admin "$OS")
@@ -278,6 +442,7 @@ main() {
   local first_run="" backup
   [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.toml" ] || first_run=1
   ig_chezmoi_args "$@"
+  ig_ask_with_gum "$first_run" "$@"
   ig_log "chezmoi ${IG_CHEZMOI_GLOBAL[*]+${IG_CHEZMOI_GLOBAL[*]}} ${IG_CHEZMOI_INIT[*]}"
   "$IG_BIN/chezmoi" ${IG_CHEZMOI_GLOBAL[@]+"${IG_CHEZMOI_GLOBAL[@]}"} "${IG_CHEZMOI_INIT[@]}" || ig_die "chezmoi init failed"
   if [ -n "$first_run" ]; then

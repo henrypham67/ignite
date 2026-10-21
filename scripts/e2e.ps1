@@ -10,7 +10,7 @@ if (-not $env:IGNITE_LOCAL_SOURCE) { $env:IGNITE_LOCAL_SOURCE = $repo }
 $answers = @(
     '--no-tty',
     '--promptString', 'Work email for git=ci@example.com',
-    '--promptChoice', 'Company git host=github',
+    '--promptChoice', 'Company git host: github.com or a self-hosted GitLab=github',
     '--promptBool', 'Use AWS=true',
     '--promptBool', 'Use Azure=false',
     '--promptBool', 'Use GCP=false',

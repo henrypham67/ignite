@@ -7,7 +7,12 @@
   .ignite.os, never from .chezmoi.os, so tests can render any OS on any host.
 
   Prompt texts double as the keys for chezmoi's --promptString/--promptBool/
-  --promptChoice overrides: keep them free of "=" and ",".
+  --promptChoice overrides: keep them free of "=" and ",". The bootstraps ask
+  the questions with gum and pass the answers back under these keys.
+
+  With IGNITE_CHOICE_MENU=1 (and customize answered true) this prints one
+  "job<TAB>default<TAB>options" line per tool choice instead of the config, so
+  the bootstraps' menus offer exactly what the prompts below accept.
 */ -}}
 
 {{- $os := .chezmoi.os -}}
@@ -41,7 +46,7 @@
 {{- with env "IGNITE_CA_BUNDLE" }}{{ $caBundle = . }}{{ end -}}
 
 {{- $email := promptStringOnce . "ignite.email" "Work email for git" -}}
-{{- $gitHost := promptChoiceOnce . "ignite.git_host" "Company git host" (list "github" "gitlab") "github" -}}
+{{- $gitHost := promptChoiceOnce . "ignite.git_host" "Company git host: github.com or a self-hosted GitLab" (list "github" "gitlab") "github" -}}
 {{- $gitlabURL := "" -}}
 {{- if eq $gitHost "gitlab" -}}
 {{-   $gitlabURL = promptStringOnce . "ignite.gitlab_url" "Company GitLab URL" -}}
@@ -61,6 +66,7 @@
        to a default in the repo still reaches this machine. */ -}}
 {{- $choices := dict -}}
 {{- if hasKey $prev "choices" }}{{ $choices = $prev.choices }}{{ end -}}
+{{- $menu := list -}}
 {{- if $customize -}}
 {{-   $defaults := (include ".chezmoidata/choices.yaml" | fromYaml).choice_defaults -}}
 {{-   $packages := (include ".chezmoidata/packages.yaml" | fromYaml).packages -}}
@@ -84,6 +90,7 @@
 {{-     end -}}
 {{-     if eq $default "none" }}{{ $opts = append $opts "none" }}{{ end -}}
 {{-     if and (gt (len $opts) 1) (has $default $opts) -}}
+{{-       $menu = append $menu (printf "%s\t%s\t%s" $job $default (join " " $opts)) -}}
 {{-       $pick := promptChoiceOnce $ (printf "ignite.choices.%s" $job) (printf "Choice for %s" $job) $opts $default -}}
 {{-       if and $pick (ne $pick $default) -}}
 {{-         $_ := set $choices $job $pick -}}
@@ -119,4 +126,8 @@
 {{- if eq $os "windows" -}}
 {{-   $_ := set $config "interpreters" (dict "ps1" (dict "command" "pwsh" "args" (list "-NoLogo" "-NoProfile" "-File"))) -}}
 {{- end -}}
+{{- if eq (env "IGNITE_CHOICE_MENU") "1" -}}
+{{ join "\n" $menu }}
+{{ else -}}
 {{ $config | toToml }}
+{{ end -}}

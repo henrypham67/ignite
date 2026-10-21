@@ -6,6 +6,7 @@
 #   IGNITE_CA_CERT       company root CA (PEM) for TLS-inspecting proxies
 #   IGNITE_NO_ADMIN=1    take the no-admin path even for an administrator
 #   IGNITE_SKIP          comma-separated catalog entries to skip
+#   IGNITE_NO_GUM=1      ask the setup questions as plain text (chezmoi's prompts)
 #   IGNITE_REPO, IGNITE_REF, IGNITE_LOCAL_SOURCE   where the dotfiles come from
 #
 # Must run under Windows PowerShell 5.1 (what a blank laptop has): no ??, ?.,
@@ -15,6 +16,7 @@
 $IgniteRawBase = 'https://raw.githubusercontent.com/henrypham67/ignite/main'
 $IgniteBin = Join-Path $HOME '.local\bin'
 $IgniteConfig = Join-Path $HOME '.config\ignite'
+$IgniteGumVersion = '2.0.2'
 
 function Write-IgniteLog {
     param([string]$Message)
@@ -361,6 +363,174 @@ function Get-IgniteChezmoiArgs {
     return [pscustomobject]@{ Global = $globalArgs; Init = $initArgs }
 }
 
+# --------------------------------------------------------------- questions
+# The first run asks the setup questions with gum (arrow keys, checkboxes) and
+# hands the answers to chezmoi init as --prompt* flags. The flag keys are the
+# prompt texts in home\.chezmoi.toml.tmpl; tests\pester\bootstrap.Tests.ps1
+# renders that template with these flags to catch a key that no longer matches.
+
+# Keys can only be read from a real console, not from a redirected stdin (CI).
+function Test-IgniteConsole {
+    return (-not [Console]::IsInputRedirected)
+}
+
+# Ask with gum on the first run, in a console, without --no-tty or
+# IGNITE_NO_GUM=1. Later runs have their answers already.
+function Test-IgniteUseGum {
+    param([bool]$FirstRun, [AllowEmptyCollection()][string[]]$Forward = @())
+    if (-not $FirstRun) { return $false }
+    if ($env:IGNITE_NO_GUM -eq '1') { return $false }
+    if ($Forward -contains '--no-tty') { return $false }
+    return (Test-IgniteConsole)
+}
+
+# Install gum with mise and return its path, or nothing when that fails;
+# chezmoi then asks the questions itself. Runs from $HOME, so a mise.toml where
+# the bootstrap was started can't stop it with a trust prompt.
+function Install-IgniteGum {
+    $ErrorActionPreference = 'Continue'
+    & mise -C $HOME install "gum@$IgniteGumVersion" | Out-Host
+    if ($LASTEXITCODE -ne 0) { return }
+    $path = & mise -C $HOME which gum --tool "gum@$IgniteGumVersion"
+    if ($LASTEXITCODE -eq 0 -and $path) { return "$path".Trim() }
+}
+
+# Run gum and return what was picked. Ctrl-C (exit 130) or a gum error stops the setup.
+function Invoke-IgnitePick {
+    param([Parameter(Mandatory = $true)][string]$Gum, [string[]]$GumArgs)
+    $out = & $Gum @GumArgs
+    if ($LASTEXITCODE -ne 0) { throw 'ignite: setup cancelled' }
+    return (@($out) -join "`n")
+}
+
+# A gum yes/no question: $true for yes, $false for no; Ctrl-C stops the setup.
+function Test-IgniteYes {
+    param([Parameter(Mandatory = $true)][string]$Gum, [string[]]$GumArgs)
+    & $Gum confirm @GumArgs | Out-Null
+    if ($LASTEXITCODE -gt 1) { throw 'ignite: setup cancelled' }
+    return ($LASTEXITCODE -eq 0)
+}
+
+# The value matches the wildcard and is safe in a chezmoi --prompt* flag,
+# which splits on commas and quotes.
+function Test-IgniteAnswer {
+    param([string]$Value, [string]$Pattern)
+    if ($Value -match '[,"\s]') { return $false }
+    return ($Value -like $Pattern)
+}
+
+function ConvertTo-IgniteFlagBool {
+    param([bool]$Value)
+    if ($Value) { return 'true' }
+    return 'false'
+}
+
+# The gum option for an optional tool group, "label|value". The tools named are
+# examples from the catalog; tests check each one is in the group on Windows.
+function Get-IgniteGroupLabel {
+    param([Parameter(Mandatory = $true)][string]$Group)
+    if ($Group -eq 'specialist') { return 'Specialist tools: vault, istioctl, cilium-cli, k6, kops, java|specialist' }
+    return 'Personal apps: obsidian, telegram, anki, ffmpeg, yt-dlp|personal'
+}
+
+# One "job<TAB>default<TAB>options" line per tool choice this machine can make,
+# printed by the config template itself (IGNITE_CHOICE_MENU=1) so the menus
+# match what chezmoi init accepts. A remote repo is fetched first; that init
+# writes its config to a throwaway file and gets the answers so far, because
+# --promptDefaults can't answer the email (it has no default).
+function Get-IgniteChoiceMenu {
+    param(
+        [Parameter(Mandatory = $true)][string]$Chezmoi,
+        [AllowEmptyCollection()][string[]]$GlobalArgs = @(),
+        [AllowEmptyCollection()][string[]]$InitArgs = @(),
+        [AllowEmptyCollection()][string[]]$Answers = @()
+    )
+    $ErrorActionPreference = 'Continue'
+    if (-not $env:IGNITE_LOCAL_SOURCE) {
+        $tmp = Join-Path ([IO.Path]::GetTempPath()) "ignite-init-$([guid]::NewGuid())"
+        New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+        & $Chezmoi @GlobalArgs @InitArgs @Answers --promptDefaults --config-path (Join-Path $tmp 'chezmoi.toml') | Out-Host
+        $fetched = ($LASTEXITCODE -eq 0)
+        Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        if (-not $fetched) { return }
+    }
+    $src = & $Chezmoi @GlobalArgs source-path
+    if ($LASTEXITCODE -ne 0) { return }
+    $env:IGNITE_CHOICE_MENU = '1'
+    try {
+        $menu = & $Chezmoi @GlobalArgs execute-template --init --promptBool 'Change default tool choices=true' `
+            --file (Join-Path "$src".Trim() '.chezmoi.toml.tmpl')
+        $ok = ($LASTEXITCODE -eq 0)
+    }
+    finally {
+        Remove-Item Env:IGNITE_CHOICE_MENU -ErrorAction SilentlyContinue
+    }
+    if ($ok) { return @($menu | Where-Object { $_ }) }
+}
+
+# Ask the setup questions with gum; returns the chezmoi --prompt* flags that answer them.
+function Get-IgniteAnswers {
+    param([Parameter(Mandatory = $true)][string]$Gum, [string]$Chezmoi, $ChezmoiArgs)
+    $email = ''
+    while (-not (Test-IgniteAnswer -Value $email -Pattern '?*@?*')) {
+        $email = Invoke-IgnitePick -Gum $Gum -GumArgs @('input', '--header', 'Work email for git', '--placeholder', 'you@company.com')
+    }
+    $gitHost = Invoke-IgnitePick -Gum $Gum -GumArgs @('choose', '--header', 'Company git host', '--label-delimiter', '|',
+        'github.com|github', 'Self-hosted GitLab|gitlab')
+    $answers = @('--promptString', "Work email for git=$email",
+        '--promptChoice', "Company git host: github.com or a self-hosted GitLab=$gitHost")
+    if ($gitHost -eq 'gitlab') {
+        $url = ''
+        while (-not (Test-IgniteAnswer -Value $url -Pattern 'https://?*')) {
+            $url = Invoke-IgnitePick -Gum $Gum -GumArgs @('input', '--header', 'Company GitLab URL (starts with https://)',
+                '--placeholder', 'https://gitlab.example.com')
+        }
+        $answers += @('--promptString', "Company GitLab URL=$url")
+    }
+
+    $clouds = @((Invoke-IgnitePick -Gum $Gum -GumArgs @('choose', '--no-limit', '--header',
+                'Clouds you use: x to tick, enter when done (none is fine)', '--label-delimiter', '|',
+                'AWS|aws', 'Azure|azure', 'GCP|gcp')) -split "`n")
+    $answers += @('--promptBool', "Use AWS=$(ConvertTo-IgniteFlagBool ($clouds -contains 'aws'))",
+        '--promptBool', "Use Azure=$(ConvertTo-IgniteFlagBool ($clouds -contains 'azure'))",
+        '--promptBool', "Use GCP=$(ConvertTo-IgniteFlagBool ($clouds -contains 'gcp'))")
+    $licensed = Test-IgniteYes -Gum $Gum -GumArgs @('--default=false', 'Does the company license Docker Desktop?')
+    $answers += @('--promptBool', "Company licenses Docker Desktop=$(ConvertTo-IgniteFlagBool $licensed)")
+
+    $groups = @((Invoke-IgnitePick -Gum $Gum -GumArgs @('choose', '--no-limit', '--header',
+                'Optional tool groups: x to tick, enter when done (none is fine)', '--label-delimiter', '|',
+                (Get-IgniteGroupLabel -Group specialist), (Get-IgniteGroupLabel -Group personal))) -split "`n")
+    $answers += @('--promptBool', "Install specialist tools=$(ConvertTo-IgniteFlagBool ($groups -contains 'specialist'))",
+        '--promptBool', "Install personal apps=$(ConvertTo-IgniteFlagBool ($groups -contains 'personal'))")
+
+    $customize = Test-IgniteYes -Gum $Gum -GumArgs @('--default=false', 'Change the default tools (editor, terminal, prompt, ...)?')
+    if ($customize) {
+        $menu = @(Get-IgniteChoiceMenu -Chezmoi $Chezmoi -GlobalArgs @($ChezmoiArgs.Global) -InitArgs @($ChezmoiArgs.Init) -Answers $answers)
+        if ($menu.Count -eq 0) { Write-IgniteLog 'could not list the tool choices; chezmoi asks them instead' }
+        foreach ($line in $menu) {
+            $job, $default, $options = $line -split "`t", 3
+            $pick = Invoke-IgnitePick -Gum $Gum -GumArgs (@('choose', '--header', "Tool for: $($job -replace '_', ' ')",
+                    '--selected', $default) + @($options -split ' '))
+            $answers += @('--promptChoice', "Choice for $job=$pick")
+        }
+    }
+    $answers += @('--promptBool', "Change default tool choices=$(ConvertTo-IgniteFlagBool $customize)")
+    return $answers
+}
+
+# On a first run in a console, ask the questions with gum; returns the chezmoi
+# init flags that answer them, or nothing (chezmoi then asks itself).
+function Get-IgniteGumAnswers {
+    param([bool]$FirstRun, [AllowEmptyCollection()][string[]]$Forward = @(), [string]$Chezmoi, $ChezmoiArgs)
+    if (-not (Test-IgniteUseGum -FirstRun $FirstRun -Forward $Forward)) { return }
+    $gum = Install-IgniteGum
+    if (-not $gum) {
+        Write-IgniteLog 'gum is not available; chezmoi asks the questions instead'
+        return
+    }
+    return (Get-IgniteAnswers -Gum $gum -Chezmoi $Chezmoi -ChezmoiArgs $ChezmoiArgs)
+}
+
 function Install-IgniteWslDistro {
     param([string]$WslState)
     if ($WslState -eq 'skipped') {
@@ -407,7 +577,7 @@ function Main {
     $firstRun = -not (Test-Path -LiteralPath (Join-Path $HOME '.config\chezmoi\chezmoi.toml'))
     $chezmoiArgs = Get-IgniteChezmoiArgs -Forward $Forward
     $globalArgs = @($chezmoiArgs.Global)
-    $initArgs = @($chezmoiArgs.Init)
+    $initArgs = @($chezmoiArgs.Init) + @(Get-IgniteGumAnswers -FirstRun $firstRun -Forward $Forward -Chezmoi $chezmoi -ChezmoiArgs $chezmoiArgs)
     Write-IgniteLog ("chezmoi " + (($globalArgs + $initArgs) -join ' '))
     & $chezmoi @globalArgs @initArgs
     if ($LASTEXITCODE -ne 0) { throw "chezmoi init failed ($LASTEXITCODE)" }
