@@ -1,0 +1,840 @@
+# The one list of everything ignite installs. Each entry does one job; the
+# catalog check (`mise run validate`) fails if two default entries share a job.
+#
+#   job        what it is for (snake_case)
+#   group      core | cloud-aws | cloud-azure | cloud-gcp | gitlab | specialist | personal
+#   option     instead of group: picked when choice_defaults/[data.ignite.choices] says so
+#   platforms  default [darwin, windows, linux, wsl]
+#   sources    mise (+ mise_skip), brew, cask, user_app, winget (+ winget_user), scoop, apt,
+#              script (.chezmoitemplates/install/<name>.sh|.ps1), bootstrap
+#   kinds      krew, vscode_ext, archive (instead of sources)
+#   bin / check_path / completion / version / requires / admin_only: see the README.
+#
+# mise values are mise registry names (`mise registry <name>`) unless a backend
+# is spelled out.
+
+packages:
+
+  # ---------------------------------------------------------------- bootstrap
+  chezmoi:
+    job: dotfiles_manager
+    group: core
+    bootstrap: true
+  mise:
+    job: tool_installer
+    group: core
+    bootstrap: true
+  git:
+    job: vcs
+    group: core
+    bootstrap: true
+  homebrew:
+    job: darwin_package_manager
+    group: core
+    platforms: [darwin]
+    bootstrap: true
+    admin_only: true
+    bin: brew
+  pwsh:
+    job: powershell
+    group: core
+    platforms: [windows]
+    bootstrap: true
+  scoop:
+    job: windows_user_package_manager
+    group: core
+    platforms: [windows]
+    bootstrap: true
+
+  # ------------------------------------------------------------------- shell
+  zsh:
+    job: shell_zsh
+    group: core
+    platforms: [linux, wsl]
+    apt: zsh
+  oh-my-zsh:
+    job: zsh_framework
+    group: core
+    platforms: [darwin, linux, wsl]
+    archive:
+      url: https://github.com/ohmyzsh/ohmyzsh/archive/HEAD.tar.gz
+      dest: .oh-my-zsh
+  zsh-autosuggestions:
+    job: zsh_autosuggest
+    group: core
+    platforms: [darwin, linux, wsl]
+    archive:
+      url: https://github.com/zsh-users/zsh-autosuggestions/archive/HEAD.tar.gz
+      dest: .oh-my-zsh/custom/plugins/zsh-autosuggestions
+      zsh_plugin: true
+  zsh-syntax-highlighting:
+    job: zsh_syntax_highlighting
+    group: core
+    platforms: [darwin, linux, wsl]
+    archive:
+      url: https://github.com/zsh-users/zsh-syntax-highlighting/archive/HEAD.tar.gz
+      dest: .oh-my-zsh/custom/plugins/zsh-syntax-highlighting
+      zsh_plugin: true
+  zsh-bat:
+    job: zsh_cat_with_bat
+    group: core
+    platforms: [darwin, linux, wsl]
+    archive:
+      url: https://github.com/fdellwing/zsh-bat/archive/HEAD.tar.gz
+      dest: .oh-my-zsh/custom/plugins/zsh-bat
+      zsh_plugin: true
+  you-should-use:
+    job: zsh_alias_reminder
+    group: core
+    platforms: [darwin, linux, wsl]
+    archive:
+      url: https://github.com/MichaelAquilina/zsh-you-should-use/archive/HEAD.tar.gz
+      dest: .oh-my-zsh/custom/plugins/you-should-use
+      zsh_plugin: true
+  zsh-completions:
+    job: zsh_extra_completions
+    group: core
+    platforms: [darwin, linux, wsl]
+    archive:
+      url: https://github.com/zsh-users/zsh-completions/archive/HEAD.tar.gz
+      dest: .oh-my-zsh/custom/plugins/zsh-completions
+      zsh_plugin: true
+  zsh-autocomplete:
+    job: zsh_completion_menu
+    option: zsh-autocomplete
+    platforms: [darwin, linux, wsl]
+    archive:
+      url: https://github.com/marlonrichert/zsh-autocomplete/archive/HEAD.tar.gz
+      dest: .oh-my-zsh/custom/plugins/zsh-autocomplete
+      zsh_plugin: true
+  starship:
+    job: prompt
+    option: starship
+    mise: starship
+  powerlevel10k:
+    job: prompt
+    option: powerlevel10k
+    platforms: [darwin, linux, wsl]
+    archive:
+      url: https://github.com/romkatv/powerlevel10k/archive/HEAD.tar.gz
+      dest: .oh-my-zsh/custom/themes/powerlevel10k
+  hack-nerd-font:
+    job: terminal_font
+    group: core
+    platforms: [darwin, windows, linux]
+    script: true
+    bin: false
+    check_path:
+      darwin: Library/Fonts/HackNerdFont-Regular.ttf
+      linux: .local/share/fonts/HackNerdFont-Regular.ttf
+      windows: AppData/Local/Microsoft/Windows/Fonts/HackNerdFont-Regular.ttf
+  tmux:
+    job: terminal_multiplexer
+    group: core
+    platforms: [darwin, linux, wsl]
+    mise: tmux
+    brew: tmux
+    apt: tmux
+
+  # ----------------------------------------------------- editors & terminals
+  vscode:
+    job: editor
+    option: vscode
+    platforms: [darwin, windows, linux]
+    cask: visual-studio-code
+    user_app: https://update.code.visualstudio.com/latest/darwin-universal/stable
+    user_app_bin: Contents/Resources/app/bin/code
+    winget: Microsoft.VisualStudioCode
+    winget_user: true
+    scoop: extras/vscode
+    script: [linux]
+    bin: code
+  zed:
+    job: editor
+    option: zed
+    platforms: [darwin, windows, linux]
+    cask: zed
+    winget: ZedIndustries.Zed
+    scoop: extras/zed
+    script: [linux]
+  neovim:
+    job: terminal_editor
+    option: neovim
+    mise: neovim
+    bin: nvim
+  vim:
+    job: terminal_editor
+    option: vim
+    brew: vim
+    apt: vim
+    winget: vim.vim
+    scoop: main/vim
+  ghostty:
+    job: terminal
+    option: ghostty
+    platforms: [darwin, linux]
+    cask: ghostty
+    user_app: https://release.files.ghostty.org/1.3.1/Ghostty.dmg
+    script: [linux]
+    admin_only: [linux]   # the Linux install is a snap
+    check_path:
+      darwin: Applications/Ghostty.app
+  windows-terminal:
+    job: terminal
+    option: windows-terminal
+    platforms: [windows]
+    winget: Microsoft.WindowsTerminal
+    winget_user: true
+    scoop: extras/windows-terminal
+    bin: wt
+  warp:
+    job: terminal
+    option: warp
+    platforms: [darwin, windows, linux]
+    cask: warp
+    winget: Warp.Warp
+    script: [linux]
+    admin_only: [linux]   # the Linux install is an apt .deb
+    bin: false
+    check_path:
+      darwin: Applications/Warp.app
+
+  # -------------------------------------------------------------- AI assistant
+  claude-code:
+    job: ai_assistant
+    option: claude-code
+    script: true
+    bin: claude
+  codex:
+    job: ai_assistant
+    option: codex
+    mise: codex
+  gemini-cli:
+    job: ai_assistant
+    option: gemini-cli
+    mise: npm:@google/gemini-cli
+    bin: gemini
+  copilot-cli:
+    job: ai_assistant
+    option: copilot-cli
+    mise: npm:@github/copilot
+    bin: copilot
+  cursor:
+    job: ai_assistant
+    option: cursor
+    platforms: [darwin, windows]
+    cask: cursor
+    winget: Anysphere.Cursor
+  opencode:
+    job: ai_assistant
+    option: opencode
+    mise: opencode
+
+  # -------------------------------------------------------------- kubernetes
+  kubectl:
+    job: kubernetes_cli
+    group: core
+    mise: kubectl
+    completion: cobra
+  helm:
+    job: kubernetes_packages
+    group: core
+    mise: helm
+    completion: cobra
+  k9s:
+    job: kubernetes_tui
+    group: core
+    mise: k9s
+    completion: cobra
+  kustomize:
+    job: kubernetes_overlays
+    group: core
+    mise: kustomize
+    completion: cobra
+  kubeconform:
+    job: kubernetes_manifest_validation
+    group: core
+    mise: kubeconform
+  argocd:
+    job: gitops_argocd
+    group: core
+    mise: argocd
+    completion: cobra
+  flux:
+    job: gitops_flux
+    group: core
+    mise: flux2
+    completion: cobra
+  kind:
+    job: local_k8s
+    option: kind
+    mise: kind
+    completion: cobra
+  minikube:
+    job: local_k8s
+    option: minikube
+    mise: minikube
+  multipass:
+    job: local_k8s
+    option: multipass
+    platforms: [darwin, windows, linux]
+    cask: multipass
+    winget: Canonical.Multipass
+    script: [linux]
+    admin_only: true
+  krew:
+    job: kubectl_plugin_manager
+    group: core
+    mise: krew
+    bin: kubectl-krew
+  # krew offers no Windows builds of ctx, ns or neat; kubectx and kubens
+  # (their standalone binaries) do the same jobs there.
+  krew-ctx:
+    job: kube_context_switch
+    group: core
+    platforms: [darwin, linux, wsl]
+    krew: ctx
+    requires: krew
+  krew-ns:
+    job: kube_namespace_switch
+    group: core
+    platforms: [darwin, linux, wsl]
+    krew: ns
+    requires: krew
+  krew-neat:
+    job: kube_manifest_clean
+    group: core
+    platforms: [darwin, linux, wsl]
+    krew: neat
+    requires: krew
+  kubectx:
+    job: kube_context_switch
+    group: core
+    platforms: [windows]
+    mise: kubectx
+  kubens:
+    job: kube_namespace_switch
+    group: core
+    platforms: [windows]
+    mise: kubens
+  krew-view-secret:
+    job: kube_secret_view
+    group: core
+    krew: view-secret
+    requires: krew
+
+  # ----------------------------------------------------------------- IaC & git
+  terraform:
+    job: iac_terraform
+    group: core
+    mise: terraform
+  tflint:
+    job: terraform_lint
+    group: core
+    mise: tflint
+  terraform-docs:
+    job: terraform_docs
+    group: core
+    mise: terraform-docs
+  ansible:
+    job: config_management
+    group: core
+    platforms: [darwin, linux, wsl]
+    mise: ansible
+  pre-commit:
+    job: git_hook_framework
+    group: core
+    mise: pre-commit
+  gh:
+    job: github_cli
+    group: core
+    mise: github-cli
+    completion: cobra
+    completion_flag: "-s"   # `gh completion zsh` prints bash; it wants `-s zsh`
+  glab:
+    job: gitlab_cli
+    group: gitlab
+    mise: glab
+    completion: cobra
+    completion_flag: "-s"
+
+  # --------------------------------------------------------------- CLI basics
+  jq:
+    job: json_query
+    group: core
+    mise: jq
+  yq:
+    job: yaml_query
+    group: core
+    mise: yq
+  direnv:
+    job: per_directory_env
+    group: core
+    mise: direnv
+    mise_skip: [windows]   # aqua has no Windows build of direnv
+    scoop: main/direnv
+  zoxide:
+    job: smart_cd
+    group: core
+    mise: zoxide
+  ripgrep:
+    job: code_search
+    group: core
+    mise: ripgrep
+    bin: rg
+  bat:
+    job: pager_with_syntax
+    group: core
+    mise: bat
+  tree:
+    job: tree_view
+    group: core
+    platforms: [darwin, linux, wsl]
+    brew: tree
+    apt: tree
+  wget:
+    job: http_download
+    group: core
+    platforms: [darwin, linux, wsl]
+    brew: wget
+    apt: wget
+
+  # ----------------------------------------------------------------- runtimes
+  node:
+    job: node_versions
+    option: mise
+    mise: node
+    version: lts
+  nvm:
+    job: node_versions
+    option: nvm
+    platforms: [darwin, linux, wsl]
+    script: true
+    bin: false
+    check_path:
+      darwin: .nvm/nvm.sh
+      linux: .nvm/nvm.sh
+      wsl: .nvm/nvm.sh
+  python:
+    job: python_runtime
+    group: core
+    mise: python
+    version: "3.13"
+    bin: python3
+  uv:
+    job: python_packaging
+    group: core
+    mise: uv
+  go:
+    job: go_runtime
+    group: core
+    mise: go
+
+  # --------------------------------------------------------------- containers
+  docker-desktop:
+    job: container_engine
+    option: docker-desktop
+    platforms: [darwin, windows]
+    cask: docker-desktop
+    winget: Docker.DockerDesktop
+    admin_only: true
+    bin: docker
+    # The docker CLI alone (colima's docker-cli) must not look like Docker Desktop.
+    check_path:
+      darwin: Applications/Docker.app
+      windows: C:/Program Files/Docker/Docker/Docker Desktop.exe
+  colima:
+    job: container_engine
+    option: colima
+    platforms: [darwin]
+    brew: colima
+  docker-cli:
+    job: docker_cli
+    group: core
+    platforms: [darwin]
+    brew: docker
+    requires: colima
+    bin: docker
+  docker-compose:
+    job: docker_compose
+    group: core
+    platforms: [darwin]
+    brew: docker-compose
+    requires: colima
+  rancher-desktop:
+    job: container_engine
+    option: rancher-desktop
+    platforms: [windows]
+    winget: SUSE.RancherDesktop
+    admin_only: true
+    bin: rdctl
+  docker-engine:
+    job: container_engine
+    option: docker-engine
+    platforms: [linux]
+    script: true
+    admin_only: true
+    bin: docker
+
+  # --------------------------------------------------------------- macOS extras
+  rectangle:
+    job: window_snapping
+    group: core
+    platforms: [darwin]
+    cask: rectangle
+    bin: false
+    check_path: {darwin: Applications/Rectangle.app}
+  alt-tab:
+    job: window_switcher
+    group: core
+    platforms: [darwin]
+    cask: alt-tab
+    bin: false
+    check_path: {darwin: Applications/AltTab.app}
+  maccy:
+    job: clipboard_history
+    group: core
+    platforms: [darwin]
+    cask: maccy
+    bin: false
+    check_path: {darwin: Applications/Maccy.app}
+
+  # -------------------------------------------------------------------- clouds
+  awscli:
+    job: aws_cli
+    group: cloud-aws
+    mise: aws-cli
+    mise_skip: [windows]
+    winget: Amazon.AWSCLI
+    scoop: main/aws
+    bin: aws
+  eksctl:
+    job: eks_cli
+    group: cloud-aws
+    mise: eksctl
+    completion: cobra
+  azure-cli:
+    job: azure_cli
+    group: cloud-azure
+    mise: azure-cli
+    bin: az
+  kubelogin:
+    job: aks_login
+    group: cloud-azure
+    mise: kubelogin
+  gcloud:
+    job: gcp_cli
+    group: cloud-gcp
+    mise: gcloud
+    mise_skip: [windows]
+    winget: Google.CloudSDK
+    scoop: extras/gcloud
+
+  # ---------------------------------------------------------------- specialist
+  cilium-cli:
+    job: cilium_cli
+    group: specialist
+    mise: cilium-cli
+    bin: cilium
+    completion: cobra
+  istioctl:
+    job: istio_cli
+    group: specialist
+    mise: istioctl
+    completion: cobra
+  clusterctl:
+    job: cluster_api_cli
+    group: specialist
+    mise: clusterctl
+  clusterawsadm:
+    job: cluster_api_aws
+    group: specialist
+    mise: clusterawsadm
+  kops:
+    job: kops_cli
+    group: specialist
+    mise: kops
+  vault:
+    job: secrets_vault_cli
+    group: specialist
+    mise: vault
+    completion: complete-c
+  teleport:
+    job: access_teleport
+    group: specialist
+    platforms: [darwin]
+    brew: teleport
+    bin: tsh
+  k6:
+    job: load_testing
+    group: specialist
+    mise: k6
+  libpq:
+    job: postgres_client
+    group: specialist
+    brew: libpq
+    apt: postgresql-client
+    scoop: main/postgresql
+    bin: psql
+  mkcert:
+    job: local_tls_certs
+    group: specialist
+    mise: mkcert
+  krew-cnpg:
+    job: cnpg_plugin
+    group: specialist
+    krew: cnpg
+    requires: krew
+  java:
+    job: jdk
+    group: specialist
+    mise: java
+    version: "21"
+  maven:
+    job: java_build_maven
+    group: specialist
+    mise: maven
+    bin: mvn
+  gradle:
+    job: java_build_gradle
+    group: specialist
+    mise: gradle
+  coursier:
+    job: scala_tooling
+    group: specialist
+    mise: coursier
+    bin: cs
+
+  # ------------------------------------------------------------------ personal
+  anki:
+    job: flashcards
+    group: personal
+    platforms: [darwin, windows]
+    cask: anki
+    winget: Anki.Anki
+    bin: false
+    check_path: {darwin: Applications/Anki.app}
+  telegram:
+    job: chat_telegram
+    group: personal
+    platforms: [darwin, windows]
+    cask: telegram
+    winget: Telegram.TelegramDesktop
+    bin: false
+    check_path: {darwin: Applications/Telegram.app}
+  obsidian:
+    job: notes_app
+    group: personal
+    platforms: [darwin, windows]
+    cask: obsidian
+    winget: Obsidian.Obsidian
+    bin: false
+    check_path: {darwin: Applications/Obsidian.app}
+  ffmpeg:
+    job: media_convert
+    group: personal
+    brew: ffmpeg
+    apt: ffmpeg
+    winget: Gyan.FFmpeg
+    scoop: main/ffmpeg
+  yt-dlp:
+    job: video_download
+    group: personal
+    mise: yt-dlp
+  whisper-cpp:
+    job: speech_to_text
+    group: personal
+    platforms: [darwin]
+    brew: whisper-cpp
+    bin: whisper-cli
+  imagemagick:
+    job: image_convert
+    group: personal
+    brew: imagemagick
+    apt: imagemagick
+    winget: ImageMagick.ImageMagick
+    scoop: main/imagemagick
+    bin: magick
+  poppler:
+    job: pdf_tools
+    group: personal
+    brew: poppler
+    apt: poppler-utils
+    scoop: main/poppler
+    bin: pdftotext
+  hugo:
+    job: static_site_generator
+    group: personal
+    mise: hugo
+  vhs:
+    job: terminal_recording
+    group: personal
+    mise: vhs
+  blueutil:
+    job: bluetooth_cli
+    group: personal
+    platforms: [darwin]
+    brew: blueutil
+
+  # ---------------------------------------------------- VS Code extensions
+  hashicorp.terraform:
+    job: vscode_terraform
+    group: core
+    vscode_ext: hashicorp.terraform
+    requires: vscode
+  github.vscode-github-actions:
+    job: vscode_github_actions
+    group: core
+    vscode_ext: github.vscode-github-actions
+    requires: vscode
+  yzhang.markdown-all-in-one:
+    job: vscode_markdown_editing
+    group: core
+    vscode_ext: yzhang.markdown-all-in-one
+    requires: vscode
+  davidanson.vscode-markdownlint:
+    job: vscode_markdown_lint
+    group: core
+    vscode_ext: davidanson.vscode-markdownlint
+    requires: vscode
+  ms-azuretools.vscode-containers:
+    job: vscode_containers
+    group: core
+    vscode_ext: ms-azuretools.vscode-containers
+    requires: vscode
+  ms-python.python:
+    job: vscode_python
+    group: core
+    vscode_ext: ms-python.python
+    requires: vscode
+  ms-python.vscode-pylance:
+    job: vscode_python_types
+    group: core
+    vscode_ext: ms-python.vscode-pylance
+    requires: vscode
+  ms-python.debugpy:
+    job: vscode_python_debug
+    group: core
+    vscode_ext: ms-python.debugpy
+    requires: vscode
+  ms-kubernetes-tools.vscode-kubernetes-tools:
+    job: vscode_kubernetes
+    group: core
+    vscode_ext: ms-kubernetes-tools.vscode-kubernetes-tools
+    requires: vscode
+  redhat.vscode-yaml:
+    job: vscode_yaml
+    group: core
+    vscode_ext: redhat.vscode-yaml
+    requires: vscode
+  tim-koehler.helm-intellisense:
+    job: vscode_helm
+    group: core
+    vscode_ext: tim-koehler.helm-intellisense
+    requires: vscode
+  golang.go:
+    job: vscode_go
+    group: core
+    vscode_ext: golang.go
+    requires: vscode
+  eamodio.gitlens:
+    job: vscode_git_history
+    group: core
+    vscode_ext: eamodio.gitlens
+    requires: vscode
+  mkhl.direnv:
+    job: vscode_direnv
+    group: core
+    vscode_ext: mkhl.direnv
+    requires: vscode
+  ms-vscode-remote.remote-ssh:
+    job: vscode_remote_ssh
+    group: core
+    vscode_ext: ms-vscode-remote.remote-ssh
+    requires: vscode
+  ms-vscode-remote.remote-containers:
+    job: vscode_remote_containers
+    group: core
+    vscode_ext: ms-vscode-remote.remote-containers
+    requires: vscode
+  ms-vscode-remote.remote-wsl:
+    job: vscode_remote_wsl
+    group: core
+    platforms: [windows]
+    vscode_ext: ms-vscode-remote.remote-wsl
+    requires: vscode
+  anthropic.claude-code:
+    job: vscode_ai_assistant
+    group: core
+    vscode_ext: anthropic.claude-code
+    requires: vscode
+  vscodevim.vim:
+    job: vscode_vim_keys
+    group: core
+    vscode_ext: vscodevim.vim
+    requires: vscode
+  streetsidesoftware.code-spell-checker:
+    job: vscode_spell_check
+    group: core
+    vscode_ext: streetsidesoftware.code-spell-checker
+    requires: vscode
+  jeff-hykin.better-shellscript-syntax:
+    job: vscode_shell_syntax
+    group: core
+    vscode_ext: jeff-hykin.better-shellscript-syntax
+    requires: vscode
+  pkief.material-icon-theme:
+    job: vscode_icon_theme
+    group: core
+    vscode_ext: pkief.material-icon-theme
+    requires: vscode
+  sdras.night-owl:
+    job: vscode_color_theme
+    group: core
+    vscode_ext: sdras.night-owl
+    requires: vscode
+  amazonwebservices.aws-toolkit-vscode:
+    job: vscode_aws
+    group: cloud-aws
+    vscode_ext: amazonwebservices.aws-toolkit-vscode
+    requires: vscode
+  ms-toolsai.jupyter:
+    job: vscode_notebooks
+    group: personal
+    vscode_ext: ms-toolsai.jupyter
+    requires: vscode
+  jebbs.plantuml:
+    job: vscode_plantuml
+    group: personal
+    vscode_ext: jebbs.plantuml
+    requires: vscode
+  hediet.vscode-drawio:
+    job: vscode_drawio
+    group: personal
+    vscode_ext: hediet.vscode-drawio
+    requires: vscode
+  pomdtr.excalidraw-editor:
+    job: vscode_excalidraw
+    group: personal
+    vscode_ext: pomdtr.excalidraw-editor
+    requires: vscode
+  jasew.anki:
+    job: vscode_anki
+    group: personal
+    vscode_ext: jasew.anki
+    requires: vscode
+  foam.foam-vscode:
+    job: vscode_notes
+    group: personal
+    vscode_ext: foam.foam-vscode
+    requires: vscode
+  mechatroner.rainbow-csv:
+    job: vscode_csv_view
+    group: personal
+    vscode_ext: mechatroner.rainbow-csv
+    requires: vscode
+  janisdd.vscode-edit-csv:
+    job: vscode_csv_edit
+    group: personal
+    vscode_ext: janisdd.vscode-edit-csv
+    requires: vscode

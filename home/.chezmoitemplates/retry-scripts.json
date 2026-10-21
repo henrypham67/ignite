@@ -1,0 +1,18 @@
+{{- /*
+  Report source -> the chezmoi script that installs it (target name without
+  the extension). Re-running a run_onchange_ script means deleting its
+  entryState key, <home>/.chezmoiscripts/<name>.<sh|ps1>, then `chezmoi apply`.
+*/ -}}
+{
+  "apt": "10-apt",
+  "brew": "10-brew",
+  "winget": "10-winget",
+  "script-admin": "15-scripts-admin",
+  "mise": "20-mise",
+  "scoop": "25-scoop",
+  "user_app": "30-user-apps",
+  "script": "40-scripts",
+  "krew": "50-krew",
+  "vscode-ext": "60-vscode-ext",
+  "completions": "87-pwsh-completions"
+}

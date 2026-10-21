@@ -1,0 +1,133 @@
+{{- /*
+  Validate the package catalog (.packages) against .choice_defaults.
+  Renders nothing when the catalog is valid. Otherwise fails once, listing
+  every problem as "- <entry or job>: <problem>".
+
+  V1 job is snake_case          V6 no two group entries share a job on a platform
+  V2 exactly one group/option   V7 a job is all-option or all-group
+  V3 known platforms            V8 option jobs have a valid default
+  V4 exactly one kind           V9 requires points at an entry with no requires
+  V5 an install source on every platform of a package entry
+*/ -}}
+{{- $errs := list -}}
+{{- $groups := list "core" "cloud-aws" "cloud-azure" "cloud-gcp" "gitlab" "specialist" "personal" -}}
+{{- $allPlatforms := list "darwin" "windows" "linux" "wsl" -}}
+{{- $packageSources := list "mise" "brew" "cask" "user_app" "winget" "scoop" "apt" "script" "bootstrap" -}}
+{{- $sourcesFor := dict
+      "darwin" (list "mise" "brew" "cask" "user_app" "script" "bootstrap")
+      "windows" (list "mise" "winget" "scoop" "script" "bootstrap")
+      "linux" (list "mise" "apt" "script" "bootstrap")
+      "wsl" (list "mise" "apt" "script" "bootstrap") -}}
+{{- $packages := .packages -}}
+{{- $owner := dict -}}
+{{- $plainJobs := dict -}}
+{{- $options := dict -}}
+
+{{- range $name, $p := $packages -}}
+{{-   $job := toString (get $p "job") -}}
+{{-   if not (regexMatch "^[a-z0-9_]+$" $job) -}}
+{{-     $errs = append $errs (printf "- %s: job %q must be snake_case" $name $job) -}}
+{{-   end -}}
+
+{{-   $hasGroup := hasKey $p "group" -}}
+{{-   $hasOption := hasKey $p "option" -}}
+{{-   if eq $hasGroup $hasOption -}}
+{{-     $errs = append $errs (printf "- %s: set exactly one of group or option" $name) -}}
+{{-   else if and $hasGroup (not (has (toString $p.group) $groups)) -}}
+{{-     $errs = append $errs (printf "- %s: unknown group %q" $name (toString $p.group)) -}}
+{{-   end -}}
+
+{{-   $platforms := $allPlatforms -}}
+{{-   if hasKey $p "platforms" }}{{ $platforms = $p.platforms }}{{ end -}}
+{{-   range $plat := $platforms -}}
+{{-     if not (has (toString $plat) $allPlatforms) -}}
+{{-       $errs = append $errs (printf "- %s: unknown platform %q" $name (toString $plat)) -}}
+{{-     end -}}
+{{-   end -}}
+
+{{-   $isPackage := false -}}
+{{-   range $src := $packageSources }}{{ if hasKey $p $src }}{{ $isPackage = true }}{{ end }}{{ end -}}
+{{-   $kinds := 0 -}}
+{{-   if $isPackage }}{{ $kinds = add $kinds 1 }}{{ end -}}
+{{-   range $kind := list "krew" "vscode_ext" "archive" }}{{ if hasKey $p $kind }}{{ $kinds = add $kinds 1 }}{{ end }}{{ end -}}
+{{-   if ne $kinds 1 -}}
+{{-     $errs = append $errs (printf "- %s: needs exactly one of: package sources, krew, vscode_ext, archive" $name) -}}
+{{-   end -}}
+
+{{-   if $isPackage -}}
+{{-     $miseSkip := list -}}
+{{-     if hasKey $p "mise_skip" }}{{ $miseSkip = $p.mise_skip }}{{ end -}}
+{{-     range $plat := $platforms -}}
+{{-       if has (toString $plat) $allPlatforms -}}
+{{-         $ok := false -}}
+{{-         range $src := get $sourcesFor (toString $plat) -}}
+{{-           if hasKey $p $src -}}
+{{-             if and (eq $src "mise") (has (toString $plat) $miseSkip) -}}
+{{-             else if and (eq $src "script") (kindIs "slice" $p.script) -}}
+{{-               if has (toString $plat) $p.script }}{{ $ok = true }}{{ end -}}
+{{-             else -}}
+{{-               $ok = true -}}
+{{-             end -}}
+{{-           end -}}
+{{-         end -}}
+{{-         if not $ok -}}
+{{-           $errs = append $errs (printf "- %s: no install source for %s" $name (toString $plat)) -}}
+{{-         end -}}
+{{-       end -}}
+{{-     end -}}
+{{-   end -}}
+
+{{-   if $hasOption -}}
+{{-     $current := list -}}
+{{-     if hasKey $options $job }}{{ $current = get $options $job }}{{ end -}}
+{{-     $_ := set $options $job (append $current (toString $p.option)) -}}
+{{-   else -}}
+{{-     $_ := set $plainJobs $job true -}}
+{{-     $clash := "" -}}
+{{-     range $plat := $platforms -}}
+{{-       $key := printf "%s/%s" (toString $plat) $job -}}
+{{-       if hasKey $owner $key -}}
+{{-         if not $clash }}{{ $clash = get $owner $key }}{{ end -}}
+{{-       else -}}
+{{-         $_ := set $owner $key $name -}}
+{{-       end -}}
+{{-     end -}}
+{{-     if $clash -}}
+{{-       $errs = append $errs (printf "- %s: job %q also provided by %s" $name $job $clash) -}}
+{{-     end -}}
+{{-   end -}}
+
+{{-   if hasKey $p "requires" -}}
+{{-     $req := toString $p.requires -}}
+{{-     if not (hasKey $packages $req) -}}
+{{-       $errs = append $errs (printf "- %s: requires %q, which is not in the catalog" $name $req) -}}
+{{-     else if hasKey (get $packages $req) "requires" -}}
+{{-       $errs = append $errs (printf "- %s: requires %q, which has its own requires (no chains)" $name $req) -}}
+{{-     end -}}
+{{-   end -}}
+{{- end -}}
+
+{{- range $job, $opts := $options -}}
+{{-   if hasKey $plainJobs $job -}}
+{{-     $errs = append $errs (printf "- %s: job mixes option entries with group entries" $job) -}}
+{{-   end -}}
+{{-   if ne $job "container_engine" -}}
+{{-     if not (hasKey $.choice_defaults $job) -}}
+{{-       $errs = append $errs (printf "- %s: no default in choice_defaults" $job) -}}
+{{-     else -}}
+{{-       $default := get $.choice_defaults $job -}}
+{{-       $values := list $default -}}
+{{-       if kindIs "map" $default }}{{ $values = values $default | sortAlpha }}{{ end -}}
+{{-       range $value := $values -}}
+{{-         if not (or (eq (toString $value) "none") (has (toString $value) $opts)) -}}
+{{-           $errs = append $errs (printf "- %s: default %q is not one of its options (%s)" $job (toString $value) (join ", " $opts)) -}}
+{{-         end -}}
+{{-       end -}}
+{{-     end -}}
+{{-   end -}}
+{{- end -}}
+
+{{- /* No colon before the newline: chezmoi folds ":\n" in error messages onto one line. */ -}}
+{{- if $errs -}}
+{{-   fail (printf "ignite catalog invalid (%d problems)\n%s" (len $errs) (join "\n" $errs)) -}}
+{{- end -}}

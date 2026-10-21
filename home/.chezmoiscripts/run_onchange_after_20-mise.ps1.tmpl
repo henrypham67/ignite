@@ -1,0 +1,18 @@
+{{- $selected := includeTemplate "selected.json" . | fromJson -}}
+{{- $items := includeTemplate "mise-order.json" . | fromJson -}}
+{{- if and (eq .ignite.os "windows") $items -}}
+# Versioned CLIs and runtimes from the ignite catalog, installed per user by mise.
+{{ template "lib.ps1" . }}
+Update-IgnitePath
+Reset-IgniteReport -Source mise
+$env:MISE_YES = '1'
+
+function Install-IgniteMise {
+    param([string]$Name, [string]$Spec)
+    Invoke-IgniteTry -Source mise -Item $Name -ScriptBlock { mise install $Spec }.GetNewClosure()
+}
+{{  range $name := $items }}
+{{-   $entry := get $selected $name }}
+Install-IgniteMise -Name '{{ $name }}' -Spec '{{ $entry.mise }}@{{ get $entry "version" | default "latest" | toString }}'
+{{- end }}
+{{ end -}}

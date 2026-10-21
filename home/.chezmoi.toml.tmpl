@@ -1,0 +1,122 @@
+{{- /*
+  ignite machine config, rendered by `chezmoi init`.
+
+  .chezmoidata and .chezmoitemplates are not available to this template during
+  init (checked with chezmoi 2.73), so the catalog and the choice defaults are
+  read with include + fromYaml. Every other template reads the OS from
+  .ignite.os, never from .chezmoi.os, so tests can render any OS on any host.
+
+  Prompt texts double as the keys for chezmoi's --promptString/--promptBool/
+  --promptChoice overrides: keep them free of "=" and ",".
+*/ -}}
+
+{{- $os := .chezmoi.os -}}
+{{- if eq $os "linux" -}}
+{{-   if .chezmoi.kernel.osrelease | lower | contains "microsoft" -}}
+{{-     $os = "wsl" -}}
+{{-   end -}}
+{{- end -}}
+
+{{- /* Values set by the bootstrap win; otherwise keep what an earlier init stored. */ -}}
+{{- $prev := dict -}}
+{{- if hasKey . "ignite" }}{{ $prev = .ignite }}{{ end -}}
+
+{{- $admin := false -}}
+{{- if hasKey $prev "admin" }}{{ $admin = $prev.admin }}{{ end -}}
+{{- with env "IGNITE_ADMIN" }}{{ $admin = eq . "1" }}{{ end -}}
+
+{{- /* Windows without winget (App Installer blocked, LTSC) uses Scoop instead. */ -}}
+{{- $winget := true -}}
+{{- if hasKey $prev "winget" }}{{ $winget = $prev.winget }}{{ end -}}
+{{- with env "IGNITE_WINGET" }}{{ $winget = eq . "1" }}{{ end -}}
+
+{{- /* No usable git (a Mac without Xcode's tools): chezmoi uses its own. */ -}}
+{{- $builtinGit := false -}}
+{{- if hasKey $prev "builtin_git" }}{{ $builtinGit = $prev.builtin_git }}{{ end -}}
+{{- with env "IGNITE_BUILTIN_GIT" }}{{ $builtinGit = eq . "1" }}{{ end -}}
+
+{{- $caCert := get $prev "ca_cert" | default "" -}}
+{{- with env "IGNITE_CA_CERT_INSTALLED" }}{{ $caCert = . }}{{ end -}}
+{{- $caBundle := get $prev "ca_bundle" | default "" -}}
+{{- with env "IGNITE_CA_BUNDLE" }}{{ $caBundle = . }}{{ end -}}
+
+{{- $email := promptStringOnce . "ignite.email" "Work email for git" -}}
+{{- $gitHost := promptChoiceOnce . "ignite.git_host" "Company git host" (list "github" "gitlab") "github" -}}
+{{- $gitlabURL := "" -}}
+{{- if eq $gitHost "gitlab" -}}
+{{-   $gitlabURL = promptStringOnce . "ignite.gitlab_url" "Company GitLab URL" -}}
+{{- end -}}
+{{- $aws := promptBoolOnce . "ignite.cloud_aws" "Use AWS" false -}}
+{{- $azure := promptBoolOnce . "ignite.cloud_azure" "Use Azure" false -}}
+{{- $gcp := promptBoolOnce . "ignite.cloud_gcp" "Use GCP" false -}}
+{{- $licensed := false -}}
+{{- if or (eq $os "darwin") (eq $os "windows") -}}
+{{-   $licensed = promptBoolOnce . "ignite.docker_licensed" "Company licenses Docker Desktop" false -}}
+{{- end -}}
+{{- $specialist := promptBoolOnce . "ignite.group_specialist" "Install specialist tools" false -}}
+{{- $personal := promptBoolOnce . "ignite.group_personal" "Install personal apps" false -}}
+{{- $customize := promptBoolOnce . "ignite.customize_choices" "Change default tool choices" false -}}
+
+{{- /* Only choices that differ from the default are stored, so a later change
+       to a default in the repo still reaches this machine. */ -}}
+{{- $choices := dict -}}
+{{- if hasKey $prev "choices" }}{{ $choices = $prev.choices }}{{ end -}}
+{{- if $customize -}}
+{{-   $defaults := (include ".chezmoidata/choices.yaml" | fromYaml).choice_defaults -}}
+{{-   $packages := (include ".chezmoidata/packages.yaml" | fromYaml).packages -}}
+{{-   range $job, $def := $defaults -}}
+{{-     $default := $def -}}
+{{-     if kindIs "map" $def -}}
+{{-       $default = "none" -}}
+{{-       if hasKey $def $os -}}
+{{-         $default = get $def $os -}}
+{{-       else if and (eq $os "wsl") (hasKey $def "linux") -}}
+{{-         $default = get $def "linux" -}}
+{{-       end -}}
+{{-     end -}}
+{{-     $opts := list -}}
+{{-     range $name, $p := $packages -}}
+{{-       if and (hasKey $p "option") (eq (toString (get $p "job")) $job) -}}
+{{-         $platforms := list "darwin" "windows" "linux" "wsl" -}}
+{{-         if hasKey $p "platforms" }}{{ $platforms = $p.platforms }}{{ end -}}
+{{-         if has $os $platforms }}{{ $opts = append $opts $p.option }}{{ end -}}
+{{-       end -}}
+{{-     end -}}
+{{-     if eq $default "none" }}{{ $opts = append $opts "none" }}{{ end -}}
+{{-     if and (gt (len $opts) 1) (has $default $opts) -}}
+{{-       $pick := promptChoiceOnce $ (printf "ignite.choices.%s" $job) (printf "Choice for %s" $job) $opts $default -}}
+{{-       if and $pick (ne $pick $default) -}}
+{{-         $_ := set $choices $job $pick -}}
+{{-       else -}}
+{{-         $_ := unset $choices $job -}}
+{{-       end -}}
+{{-     end -}}
+{{-   end -}}
+{{- end -}}
+
+{{- $ignite := dict
+      "os" $os
+      "admin" $admin
+      "email" $email
+      "git_host" $gitHost
+      "gitlab_url" $gitlabURL
+      "cloud_aws" $aws
+      "cloud_azure" $azure
+      "cloud_gcp" $gcp
+      "docker_licensed" $licensed
+      "group_specialist" $specialist
+      "group_personal" $personal
+      "customize_choices" $customize
+      "choices" $choices
+      "ca_cert" $caCert
+      "ca_bundle" $caBundle
+      "winget" $winget
+      "builtin_git" $builtinGit -}}
+{{- $config := dict "data" (dict "ignite" $ignite) -}}
+{{- if $builtinGit -}}
+{{-   $_ := set $config "useBuiltinGit" "true" -}}
+{{- end -}}
+{{- if eq $os "windows" -}}
+{{-   $_ := set $config "interpreters" (dict "ps1" (dict "command" "pwsh" "args" (list "-NoLogo" "-NoProfile" "-File"))) -}}
+{{- end -}}
+{{ $config | toToml }}

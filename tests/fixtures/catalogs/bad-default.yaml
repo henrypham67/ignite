@@ -1,0 +1,9 @@
+packages:
+  vim:
+    job: editor
+    option: vim
+    mise: aqua:example/vim
+  nano:
+    job: editor
+    option: nano
+    mise: aqua:example/nano

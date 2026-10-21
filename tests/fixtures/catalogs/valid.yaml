@@ -1,0 +1,134 @@
+packages:
+  # --- option jobs (choice_defaults in choices.yaml) ---
+  vscode:
+    job: editor
+    option: vscode
+    platforms: [darwin, windows, linux]
+    cask: visual-studio-code
+    user_app: https://example.com/vscode.zip
+    winget: Microsoft.VisualStudioCode
+    winget_user: true
+    scoop: extras/vscode
+    script: true
+    bin: code
+  zed:
+    job: editor
+    option: zed
+    platforms: [darwin, windows, linux]
+    cask: zed
+    winget: ZedIndustries.Zed
+    script: true
+  starship:
+    job: prompt
+    option: starship
+    mise: aqua:starship/starship
+  powerlevel10k:
+    job: prompt
+    option: powerlevel10k
+    platforms: [darwin, linux, wsl]
+    archive: {url: "https://example.com/p10k.tar.gz", dest: .oh-my-zsh/custom/themes/powerlevel10k}
+  ghostty:
+    job: terminal
+    option: ghostty
+    platforms: [darwin, linux]
+    cask: ghostty
+    script: true
+  windows-terminal:
+    job: terminal
+    option: windows-terminal
+    platforms: [windows]
+    winget: Microsoft.WindowsTerminal
+    bin: wt
+
+  # --- container_engine (computed choice) ---
+  docker-desktop:
+    job: container_engine
+    option: docker-desktop
+    platforms: [darwin, windows]
+    cask: docker-desktop
+    winget: Docker.DockerDesktop
+    admin_only: true
+  colima:
+    job: container_engine
+    option: colima
+    platforms: [darwin]
+    brew: colima
+  rancher-desktop:
+    job: container_engine
+    option: rancher-desktop
+    platforms: [windows]
+    winget: SUSE.RancherDesktop
+    admin_only: true
+  docker-engine:
+    job: container_engine
+    option: docker-engine
+    platforms: [linux]
+    script: true
+    admin_only: true
+
+  # --- group jobs ---
+  kubectl:
+    job: kubernetes_cli
+    group: core
+    mise: aqua:kubernetes/kubectl
+    brew: kubernetes-cli
+  homebrew:
+    job: darwin_pkg_manager
+    group: core
+    platforms: [darwin]
+    bootstrap: true
+    admin_only: true
+    bin: brew
+  rectangle:
+    job: window_snapping
+    group: core
+    platforms: [darwin]
+    cask: rectangle
+  sevenzip:
+    job: archiver
+    group: core
+    platforms: [windows]
+    winget: 7zip.7zip
+    scoop: main/7zip
+  tree:
+    job: tree_view
+    group: core
+    platforms: [darwin, linux, wsl]
+    brew: tree
+    apt: tree
+  glab:
+    job: gitlab_cli
+    group: gitlab
+    mise: gitlab:gitlab-org/cli
+  awscli:
+    job: aws_cli
+    group: cloud-aws
+    mise: aws-cli
+  cilium-cli:
+    job: cilium_cli
+    group: specialist
+    mise: aqua:cilium/cilium-cli
+    bin: cilium
+  krew-ctx:
+    job: kube_context_switch
+    group: core
+    krew: ctx
+  editor-helper:
+    job: editor_helper
+    group: core
+    platforms: [darwin, linux]
+    cask: editor-helper
+    script: [linux]
+  snap-only-on-linux:
+    job: snap_thing
+    group: core
+    platforms: [darwin, linux]
+    mise: aqua:example/snap-thing
+    mise_skip: [linux]
+    script: [linux]
+    admin_only: [linux]
+  hashicorp.terraform:
+    job: terraform_lang
+    group: core
+    vscode_ext: hashicorp.terraform
+    requires: vscode

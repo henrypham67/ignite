@@ -1,0 +1,20 @@
+packages:
+  a:
+    job: a
+    group: core
+    mise: aqua:example/a
+  b:
+    job: b
+    group: core
+    mise: aqua:example/b
+    requires: a
+  c:
+    job: c
+    group: core
+    mise: aqua:example/c
+    requires: b
+  d:
+    job: d
+    group: core
+    mise: aqua:example/d
+    requires: missing

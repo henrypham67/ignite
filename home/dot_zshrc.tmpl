@@ -1,0 +1,123 @@
+{{- $selected := includeTemplate "selected.json" . | fromJson -}}
+{{- $choices := includeTemplate "effective-choices.json" . | fromJson -}}
+{{- $p10k := hasKey $selected "powerlevel10k" -}}
+{{- $autocomplete := hasKey $selected "zsh-autocomplete" -}}
+{{- if $p10k -}}
+# Powerlevel10k instant prompt: keep at the very top.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
+{{ end -}}
+# ~/.zshrc, managed by ignite (chezmoi). Machine-only additions go in ~/.zshrc.local.
+
+# Tools first, so oh-my-zsh plugins find them: ~/.local/bin (chezmoi, mise,
+# claude), mise shims, krew plugins, Go binaries.
+export PATH="$HOME/.local/bin:${XDG_DATA_HOME:-$HOME/.local/share}/mise/shims:${KREW_ROOT:-$HOME/.krew}/bin:$HOME/go/bin:$PATH"
+{{- if and (hasKey $selected "libpq") (eq (get $selected "libpq").method "brew") }}
+export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
+{{- end }}
+
+export ZSH="$HOME/.oh-my-zsh"
+# chezmoi keeps oh-my-zsh up to date; its own updater would also call git on
+# every start (and on a Mac without Xcode's tools, pop the install dialog).
+zstyle ':omz:update' mode disabled
+{{- if hasKey $selected "zsh-completions" }}
+fpath+=("$ZSH/custom/plugins/zsh-completions/src")
+{{- end }}
+{{- if $autocomplete }}
+# zsh-autocomplete must load before oh-my-zsh runs compinit.
+source "$ZSH/custom/plugins/zsh-autocomplete/zsh-autocomplete.plugin.zsh"
+{{- end }}
+ZSH_THEME="{{ if $p10k }}powerlevel10k/powerlevel10k{{ end }}"
+{{- $plugins := list "direnv" "docker" "docker-compose" "history" "git" "kubectl" "helm" "terraform" "encode64" "jsontools" }}
+{{- if .ignite.cloud_aws }}{{ $plugins = append $plugins "aws" }}{{ end }}
+{{- if hasKey $selected "ansible" }}{{ $plugins = append $plugins "ansible" }}{{ end }}
+{{- $highlighting := false }}
+{{- range $name, $entry := $selected }}
+{{-   if and (eq $entry.method "archive") (get $entry.archive "zsh_plugin") }}
+{{-     $plugin := base $entry.archive.dest }}
+{{-     if eq $plugin "zsh-syntax-highlighting" }}{{ $highlighting = true }}
+{{-     else if not (has $plugin (list "zsh-completions" "zsh-autocomplete")) }}{{ $plugins = append $plugins $plugin }}
+{{-     end }}
+{{-   end }}
+{{- end }}
+{{- if $highlighting }}{{ $plugins = append $plugins "zsh-syntax-highlighting" }}{{ end }}
+plugins=({{ join " " $plugins }})
+source "$ZSH/oh-my-zsh.sh"
+
+HISTSIZE=50000
+SAVEHIST=50000
+setopt SHARE_HISTORY
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_SAVE_NO_DUPS
+setopt HIST_FIND_NO_DUPS
+setopt HIST_EXPIRE_DUPS_FIRST
+setopt HIST_REDUCE_BLANKS
+setopt INC_APPEND_HISTORY
+setopt AUTO_CD
+setopt AUTO_PUSHD
+setopt PUSHD_IGNORE_DUPS
+setopt INTERACTIVE_COMMENTS
+
+{{- $editor := "vi" }}
+{{- if eq (get $choices "terminal_editor") "neovim" }}{{ $editor = "nvim" }}
+{{- else if eq (get $choices "terminal_editor") "vim" }}{{ $editor = "vim" }}{{ end }}
+
+export EDITOR={{ $editor | squote }}
+
+command -v mise >/dev/null && eval "$(mise activate zsh)"
+
+# Completions load on first use, so new shells stay fast.
+_lazy_completion() {
+  local cmd="$1" comp_cmd="$2"
+  eval "
+    _${cmd//-/_}_lazy() {
+      unfunction _${cmd//-/_}_lazy
+      eval \"\$(${comp_cmd})\"
+    }
+    compdef _${cmd//-/_}_lazy ${cmd}
+  "
+}
+{{- range $name, $entry := $selected }}
+{{-   $bin := get $entry "bin" | default $name }}
+{{-   if and (eq (toString (get $entry "completion")) "cobra") (ne $name "kubectl") }}
+command -v {{ $bin }} &>/dev/null && _lazy_completion {{ $bin }} '{{ $bin }} completion {{ with get $entry "completion_flag" }}{{ . }} {{ end }}zsh'
+{{-   else if eq (toString (get $entry "completion")) "complete-c" }}
+command -v {{ $bin }} &>/dev/null && autoload -U +X bashcompinit && bashcompinit && complete -C {{ $bin }} {{ $bin }}
+{{-   end }}
+{{- end }}
+
+{{- if not $autocomplete }}
+zstyle ':completion:*' menu select
+{{- end }}
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
+zstyle ':completion:*' use-cache on
+zstyle ':completion:*' cache-path ~/.zsh/cache
+
+command -v zoxide >/dev/null && eval "$(zoxide init zsh)"
+{{- $editorApp := "$EDITOR" }}
+{{- if hasKey $selected "vscode" }}{{ $editorApp = "code" }}{{ else if hasKey $selected "zed" }}{{ $editorApp = "zed" }}{{ end }}
+zz() { z "$@" && {{ $editorApp }} . && exit }
+{{- if hasKey $selected "nvm" }}
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+{{- end }}
+
+{{ includeTemplate "shell-env.sh" . }}
+
+{{- range $alias, $def := .aliases }}
+{{-   if not (and (hasKey $def "omz") (has $def.omz $plugins)) }}
+alias {{ $alias }}={{ $def.cmd | squote }}
+{{-   end }}
+{{- end }}
+
+[ -f ~/.zshrc.local ] && source ~/.zshrc.local
+{{- if $p10k }}
+
+[[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
+{{- else if hasKey $selected "starship" }}
+
+command -v starship >/dev/null && eval "$(starship init zsh)"
+{{- end }}

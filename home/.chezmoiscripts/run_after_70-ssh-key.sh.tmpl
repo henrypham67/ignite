@@ -1,0 +1,12 @@
+{{- if ne .ignite.os "windows" -}}
+#!/bin/bash
+# One SSH key per laptop, created on first apply. No passphrase so the run
+# stays unattended; ignite-doctor suggests adding one.
+set -euo pipefail
+key="$HOME/.ssh/id_ed25519"
+if [ ! -f "$key" ]; then
+  mkdir -p "$HOME/.ssh"
+  chmod 700 "$HOME/.ssh"
+  ssh-keygen -q -t ed25519 -N "" -C {{ .ignite.email | squote }}" $(hostname -s 2>/dev/null || hostname)" -f "$key"
+fi
+{{ end -}}

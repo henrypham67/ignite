@@ -1,0 +1,24 @@
+{{- /*
+  What ignite-doctor checks on this machine, one row per line:
+    expect <name> <job> <method> <kind> <value> <mise spec or ->   selected entries
+    alt    <name> <job> -        <kind> <value> -                  unselected alternatives
+  Both doctors embed this at render time, so they never parse YAML.
+*/ -}}
+{{- $os := .ignite.os -}}
+{{- $selected := includeTemplate "selected.json" . | fromJson -}}
+{{- range $name, $entry := $selected }}
+{{-   $check := includeTemplate "doctor-check" (dict "name" $name "entry" $entry "os" $os) | trim }}
+{{-   $spec := "-" }}
+{{-   if eq $entry.method "mise" }}{{ $spec = $entry.mise }}{{ end }}
+{{ printf "expect\t%s\t%s\t%s\t%s\t%s" $name (toString $entry.job) $entry.method $check $spec }}
+{{- end }}
+{{- range $name, $entry := .packages }}
+{{-   $platforms := list "darwin" "windows" "linux" "wsl" }}
+{{-   if hasKey $entry "platforms" }}{{ $platforms = $entry.platforms }}{{ end }}
+{{-   if and (hasKey $entry "option") (not (hasKey $selected $name)) (has $os $platforms) }}
+{{-     $check := includeTemplate "doctor-check" (dict "name" $name "entry" $entry "os" $os) | trim }}
+{{-     if not (hasPrefix "none" $check) }}
+{{ printf "alt\t%s\t%s\t-\t%s\t-" $name (toString $entry.job) $check }}
+{{-     end }}
+{{-   end }}
+{{- end }}

@@ -1,0 +1,57 @@
+{{- /*
+  Targets each OS does not get. Paths are relative to the home directory.
+  Tasks add lines here as they add OS-specific files.
+*/ -}}
+
+{{- if eq .ignite.os "windows" }}
+# --- not on Windows ---
+.zshrc
+.zprofile
+.bashrc
+.oh-my-zsh
+.oh-my-zsh/**
+.local/bin/ignite-doctor
+{{- end }}
+
+{{- if ne .ignite.os "windows" }}
+# --- Windows only ---
+AppData
+AppData/**
+.config/powershell
+.config/powershell/**
+.local/bin/ignite-doctor.ps1
+{{- end }}
+
+{{- if ne .ignite.os "darwin" }}
+# --- macOS only ---
+Library
+Library/**
+{{- end }}
+
+{{- if ne .ignite.os "linux" }}
+# --- plain Linux only (WSL uses VS Code on the Windows side) ---
+.config/Code
+.config/Code/**
+{{- end }}
+
+{{- /* Config for a tool this machine doesn't get (another choice, another OS). */ -}}
+{{- $selected := includeTemplate "selected.json" . | fromJson }}
+{{- if not (hasKey $selected "vscode") }}
+# --- VS Code not selected ---
+Library/Application Support/Code
+Library/Application Support/Code/**
+AppData/Roaming/Code
+AppData/Roaming/Code/**
+.config/Code
+.config/Code/**
+{{- end }}
+{{- if not (hasKey $selected "ghostty") }}
+# --- Ghostty not selected ---
+.config/ghostty
+.config/ghostty/**
+{{- end }}
+{{- if not (hasKey $selected "neovim") }}
+# --- Neovim not selected ---
+.config/nvim
+.config/nvim/**
+{{- end }}

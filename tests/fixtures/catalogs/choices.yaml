@@ -1,0 +1,4 @@
+choice_defaults:
+  editor: vscode
+  prompt: starship
+  terminal: {darwin: ghostty, linux: ghostty, wsl: none, windows: windows-terminal}

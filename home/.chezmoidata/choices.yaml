@@ -1,0 +1,15 @@
+# The default tool for each job that has alternatives. A value can be one
+# option for every OS, or a map os -> option (wsl falls back to linux).
+# "none" installs nothing for that job. Override per machine with
+# `chezmoi edit-config` -> [data.ignite.choices], then `chezmoi apply`.
+# container_engine is not listed: it is computed from the OS and whether the
+# company licenses Docker Desktop.
+choice_defaults:
+  editor: vscode
+  terminal_editor: neovim
+  terminal: {darwin: ghostty, linux: ghostty, wsl: none, windows: windows-terminal}
+  prompt: starship
+  local_k8s: kind
+  node_versions: mise          # option on entry "node"; nvm is the alternative
+  zsh_completion_menu: none    # zsh-autocomplete is the alternative
+  ai_assistant: claude-code

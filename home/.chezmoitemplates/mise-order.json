@@ -1,0 +1,18 @@
+{{- /*
+  Names of the selected entries installed by mise, in install order, as a JSON
+  list: runtimes first (other tools are built on them), then everything else,
+  with npm:/pipx:/pypi: backends last. Shared by the .sh and .ps1 runners.
+*/ -}}
+{{- $selected := includeTemplate "selected.json" . | fromJson -}}
+{{- $first := list -}}
+{{- range $name := list "node" "python" "go" "uv" -}}
+{{-   if and (hasKey $selected $name) (eq (get $selected $name).method "mise") }}{{ $first = append $first $name }}{{ end -}}
+{{- end -}}
+{{- $middle := list -}}
+{{- $last := list -}}
+{{- range $name, $entry := $selected -}}
+{{-   if and (eq $entry.method "mise") (not (has $name $first)) -}}
+{{-     if regexMatch "^(npm|pipx|pypi):" $entry.mise }}{{ $last = append $last $name }}{{ else }}{{ $middle = append $middle $name }}{{ end -}}
+{{-   end -}}
+{{- end -}}
+{{ concat $first $middle $last | toJson }}

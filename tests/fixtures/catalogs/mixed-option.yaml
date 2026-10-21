@@ -1,0 +1,9 @@
+packages:
+  vscode:
+    job: editor
+    option: vscode
+    mise: aqua:example/vscode
+  zed:
+    job: editor
+    group: core
+    mise: aqua:example/zed

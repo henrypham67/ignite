@@ -1,0 +1,14 @@
+# Managed by ignite (chezmoi): edit home/.chezmoidata/packages.yaml, not this file.
+{{- $selected := includeTemplate "selected.json" . | fromJson }}
+[settings]
+# ignite installs tools explicitly. Left on, every shim (kubectl, helm, ...)
+# would first try to install any tool that's missing, so one tool that failed
+# to install (no build for this OS, a rate limit) would break all the others.
+auto_install = false
+
+[tools]
+{{- range $name, $entry := $selected }}
+{{-   if eq $entry.method "mise" }}
+{{ $entry.mise | quote }} = {{ get $entry "version" | default "latest" | toString | quote }}
+{{-   end }}
+{{- end }}

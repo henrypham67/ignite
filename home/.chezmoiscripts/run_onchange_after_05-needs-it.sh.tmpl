@@ -1,0 +1,13 @@
+{{- if ne .ignite.os "windows" -}}
+#!/bin/bash
+# Record the catalog entries this machine can't install without admin rights,
+# so ignite-doctor lists them under "Needs IT".
+set -uo pipefail
+{{ template "lib.sh" . }}
+ig_reset plan
+{{- range $name, $entry := includeTemplate "selected.json" . | fromJson }}
+{{-   if eq $entry.method "needs_it" }}
+ig_report plan needs-it {{ $name }} "needs admin"
+{{-   end }}
+{{- end }}
+{{ end -}}

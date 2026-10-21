@@ -1,0 +1,3 @@
+# Minimal machine config used by the helper self-tests.
+[data]
+probe = "from-fixture"

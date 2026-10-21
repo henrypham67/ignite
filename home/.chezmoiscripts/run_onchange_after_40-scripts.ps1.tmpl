@@ -1,0 +1,17 @@
+{{- $selected := includeTemplate "selected.json" . | fromJson -}}
+{{- $items := list -}}
+{{- range $name, $entry := $selected -}}
+{{-   if eq $entry.method "script" }}{{ $items = append $items $name }}{{ end -}}
+{{- end -}}
+{{- if and (eq .ignite.os "windows") $items -}}
+# Catalog entries installed by their own script (.chezmoitemplates/install/).
+{{ template "lib.ps1" . }}
+Update-IgnitePath
+Reset-IgniteReport -Source script
+{{- range $name := $items }}
+
+Invoke-IgniteTry -Source script -Item '{{ $name }}' -ScriptBlock {
+{{ includeTemplate (printf "install/%s.ps1" $name) $ | trim | indent 4 }}
+}
+{{- end }}
+{{ end -}}

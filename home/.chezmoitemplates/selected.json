@@ -1,0 +1,100 @@
+{{- /*
+  The catalog entries this machine gets, as a JSON object name -> entry, each
+  with an added "method": how it gets installed here (mise, brew, cask,
+  user_app, winget, winget_user, scoop, apt, script, krew, vscode_ext,
+  archive, bootstrap, or needs_it when it can't be installed without admin).
+  Validates the catalog first. Use: includeTemplate "selected.json" . | fromJson
+*/ -}}
+{{- includeTemplate "validate-catalog" . -}}
+{{- $os := .ignite.os -}}
+{{- $admin := .ignite.admin -}}
+{{- $winget := true -}}
+{{- if hasKey .ignite "winget" }}{{ $winget = .ignite.winget }}{{ end -}}
+{{- $choices := includeTemplate "effective-choices.json" . | fromJson -}}
+{{- $groupOn := dict
+      "core" true
+      "cloud-aws" .ignite.cloud_aws
+      "cloud-azure" .ignite.cloud_azure
+      "cloud-gcp" .ignite.cloud_gcp
+      "gitlab" (eq .ignite.git_host "gitlab")
+      "specialist" .ignite.group_specialist
+      "personal" .ignite.group_personal -}}
+
+{{- $kept := dict -}}
+{{- range $name, $p := .packages -}}
+{{-   $platforms := list "darwin" "windows" "linux" "wsl" -}}
+{{-   if hasKey $p "platforms" }}{{ $platforms = $p.platforms }}{{ end -}}
+{{-   if has $os $platforms -}}
+{{-     if hasKey $p "option" -}}
+{{-       if eq (toString (get $choices (toString $p.job))) (toString $p.option) -}}
+{{-         $_ := set $kept $name $p -}}
+{{-       end -}}
+{{-     else if get $groupOn (toString $p.group) -}}
+{{-       $_ := set $kept $name $p -}}
+{{-     end -}}
+{{-   end -}}
+{{- end -}}
+
+{{- $out := dict -}}
+{{- range $name, $p := $kept -}}
+{{-   if or (not (hasKey $p "requires")) (hasKey $kept (toString $p.requires)) -}}
+{{-     $miseSkip := list -}}
+{{-     if hasKey $p "mise_skip" }}{{ $miseSkip = $p.mise_skip }}{{ end -}}
+{{-     $script := false -}}
+{{-     if kindIs "slice" (get $p "script") -}}
+{{-       $script = has $os $p.script -}}
+{{-     else if get $p "script" -}}
+{{-       $script = true -}}
+{{-     end -}}
+{{-     $adminOnly := false -}}
+{{-     if kindIs "slice" (get $p "admin_only") -}}
+{{-       $adminOnly = has $os $p.admin_only -}}
+{{-     else if get $p "admin_only" -}}
+{{-       $adminOnly = true -}}
+{{-     end -}}
+{{-     $method := "needs_it" -}}
+{{-     if and $adminOnly (not $admin) -}}
+{{-       $method = "needs_it" -}}
+{{-     else if get $p "bootstrap" -}}
+{{-       $method = "bootstrap" -}}
+{{-     else if hasKey $p "krew" -}}
+{{-       $method = "krew" -}}
+{{-     else if hasKey $p "vscode_ext" -}}
+{{-       $method = "vscode_ext" -}}
+{{-     else if hasKey $p "archive" -}}
+{{-       $method = "archive" -}}
+{{-     else if and (hasKey $p "mise") (not (has $os $miseSkip)) -}}
+{{-       $method = "mise" -}}
+{{-     else if eq $os "darwin" -}}
+{{-       if and $admin (hasKey $p "brew") -}}
+{{-         $method = "brew" -}}
+{{-       else if and $admin (hasKey $p "cask") -}}
+{{-         $method = "cask" -}}
+{{-       else if and (not $admin) (hasKey $p "user_app") -}}
+{{-         $method = "user_app" -}}
+{{-       else if $script -}}
+{{-         $method = "script" -}}
+{{-       end -}}
+{{-     else if eq $os "windows" -}}
+{{-       if and $admin $winget (hasKey $p "winget") -}}
+{{-         $method = "winget" -}}
+{{-       else if and (not $admin) $winget (hasKey $p "winget") (get $p "winget_user") -}}
+{{-         $method = "winget_user" -}}
+{{-       else if hasKey $p "scoop" -}}
+{{-         $method = "scoop" -}}
+{{-       else if $script -}}
+{{-         $method = "script" -}}
+{{-       end -}}
+{{-     else -}}
+{{-       if and $admin (hasKey $p "apt") -}}
+{{-         $method = "apt" -}}
+{{-       else if $script -}}
+{{-         $method = "script" -}}
+{{-       end -}}
+{{-     end -}}
+{{-     $entry := deepCopy $p -}}
+{{-     $_ := set $entry "method" $method -}}
+{{-     $_ := set $out $name $entry -}}
+{{-   end -}}
+{{- end -}}
+{{ $out | toJson }}

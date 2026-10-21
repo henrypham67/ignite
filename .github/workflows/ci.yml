@@ -1,0 +1,95 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: jdx/mise-action@v2
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+      - run: mise run lint
+      - name: Secrets scan
+        run: mise exec -- gitleaks git --redact --no-banner .
+      - name: Employer denylist
+        run: scripts/check-denylist.sh
+        env:
+          IGNITE_DENYLIST: ${{ secrets.IGNITE_DENYLIST }}
+          IGNITE_DENYLIST_REQUIRED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '1' || '' }}
+
+  unit:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - name: Install zsh (for zsh -n checks)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
+      - run: mise run validate
+      - run: mise run test
+
+  pester:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          install: false
+      - name: Install chezmoi
+        shell: pwsh
+        # Put chezmoi on the job's PATH so every pwsh step (and Pester) finds it.
+        run: |
+          mise install chezmoi
+          Split-Path -Parent (mise which chezmoi) | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+      - name: Install Pester
+        shell: pwsh
+        run: Install-Module Pester -MinimumVersion 5.5 -Scope CurrentUser -Force -SkipPublisherCheck
+      - name: Pester
+        shell: pwsh
+        run: |
+          chezmoi --version
+          Invoke-Pester -Path tests/pester -CI
+
+  e2e:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+        mode: [admin, noadmin]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      IGNITE_NO_ADMIN: ${{ matrix.mode == 'noadmin' && '1' || '' }}
+      # VM runtimes, GUI terminals and WSL can't run on hosted runners.
+      IGNITE_SKIP: docker-desktop,rancher-desktop,colima,docker-cli,docker-compose,multipass,windows-terminal,wsl
+      # Hosted runners share IPs, so unauthenticated GitHub API calls hit limits.
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bootstrap (macOS, Linux)
+        if: runner.os != 'Windows'
+        run: bash scripts/e2e.sh
+      - name: Bootstrap (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/e2e.ps1

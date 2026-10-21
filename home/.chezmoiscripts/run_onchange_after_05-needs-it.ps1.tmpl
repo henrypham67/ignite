@@ -1,0 +1,11 @@
+{{- if eq .ignite.os "windows" -}}
+# Record the catalog entries this machine can't install without admin rights,
+# so ignite-doctor lists them under "Needs IT".
+{{ template "lib.ps1" . }}
+Reset-IgniteReport -Source plan
+{{- range $name, $entry := includeTemplate "selected.json" . | fromJson }}
+{{-   if eq $entry.method "needs_it" }}
+Add-IgniteReport -Source plan -Status needs-it -Item '{{ $name }}' -Detail 'needs admin'
+{{-   end }}
+{{- end }}
+{{ end -}}

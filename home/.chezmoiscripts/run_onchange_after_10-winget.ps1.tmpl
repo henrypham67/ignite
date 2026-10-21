@@ -1,0 +1,50 @@
+{{- $selected := includeTemplate "selected.json" . | fromJson -}}
+{{- $items := list -}}
+{{- range $name, $entry := $selected -}}
+{{-   if eq $entry.method "winget" }}{{ $items = append $items $name }}{{ end -}}
+{{- end -}}
+{{- if and (eq .ignite.os "windows") $items -}}
+# winget packages from the ignite catalog, installed machine-wide. They all run
+# in one elevated batch, so there is a single UAC prompt.
+{{ template "lib.ps1" . }}
+Update-IgnitePath
+Reset-IgniteReport -Source winget
+
+$batch = @'
+{{ template "lib.ps1" . }}
+function Install-IgniteWinget {
+    param([string]$Name, [string]$Id)
+    Invoke-IgniteTry -Source winget -Item $Name -ScriptBlock {
+        winget list --id $Id -e --accept-source-agreements --disable-interactivity *> $null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Output "$Id is already installed"
+            return
+        }
+        winget install --id $Id -e --silent --scope machine --accept-package-agreements --accept-source-agreements --disable-interactivity
+    }.GetNewClosure()
+}
+{{- range $name := $items }}
+Install-IgniteWinget -Name '{{ $name }}' -Id '{{ (get $selected $name).winget }}'
+{{- end }}
+'@
+
+$file = Join-Path ([IO.Path]::GetTempPath()) "ignite-winget-$([guid]::NewGuid()).ps1"
+Set-Content -LiteralPath $file -Value $batch -Encoding utf8NoBOM
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$elevated = ([Security.Principal.WindowsPrincipal]$identity).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+try {
+    if ($elevated) {
+        & $file
+    }
+    else {
+        # Start-Process doesn't quote list items: a temp path with a space breaks -File.
+        Start-Process pwsh -Verb RunAs -Wait -ArgumentList @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$file`"")
+    }
+}
+catch {
+    Add-IgniteReport -Source winget -Status failed -Item elevation -Detail "elevated winget batch did not run: $($_.Exception.Message)"
+}
+finally {
+    Remove-Item -LiteralPath $file -ErrorAction SilentlyContinue
+}
+{{ end -}}

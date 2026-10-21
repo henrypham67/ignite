@@ -1,0 +1,13 @@
+# ~/.ssh/config, managed by ignite (chezmoi). Each laptop has its own key.
+# Host-specific entries go in ~/.ssh/config.local.
+Include ~/.ssh/config.local
+
+Host *
+  IdentityFile ~/.ssh/id_ed25519
+{{- if ne .ignite.os "windows" }}
+  AddKeysToAgent yes
+{{- end }}
+{{- if eq .ignite.os "darwin" }}
+  IgnoreUnknown UseKeychain
+  UseKeychain yes
+{{- end }}

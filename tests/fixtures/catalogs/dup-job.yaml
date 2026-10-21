@@ -1,0 +1,10 @@
+packages:
+  a:
+    job: editor_cli
+    group: core
+    mise: aqua:example/a
+  b:
+    job: editor_cli
+    group: core
+    platforms: [darwin]
+    brew: b

@@ -1,0 +1,17 @@
+[data.ignite]
+os = "linux"
+admin = true
+email = "ci@example.com"
+git_host = "gitlab"
+gitlab_url = "https://gitlab.example.com"
+cloud_aws = false
+cloud_azure = false
+cloud_gcp = false
+docker_licensed = false
+group_specialist = false
+group_personal = false
+customize_choices = false
+ca_cert = "/home/u/.config/ignite/ca.pem"
+ca_bundle = "/home/u/.config/ignite/ca-bundle.pem"
+
+[data.ignite.choices]

@@ -1,0 +1,34 @@
+{{- $choices := includeTemplate "effective-choices.json" . | fromJson -}}
+# ~/.gitconfig, managed by ignite (chezmoi). Machine-only settings: ~/.gitconfig.local
+[user]
+	name = Henry Pham
+	email = {{ .ignite.email }}
+[core]
+	editor = {{ if eq (get $choices "terminal_editor") "vim" }}vim{{ else }}nvim{{ end }}
+	excludesfile = ~/.gitignore_global
+	hooksPath = ~/.git-hooks
+[http]
+	postBuffer = 157286400
+{{- if .ignite.ca_cert }}
+{{-   if eq .ignite.os "windows" }}
+	sslBackend = schannel
+{{-   else }}
+	sslCAInfo = {{ .ignite.ca_bundle }}
+{{-   end }}
+{{- end }}
+[credential "https://github.com"]
+	helper =
+	helper = !gh auth git-credential
+[credential "https://gist.github.com"]
+	helper =
+	helper = !gh auth git-credential
+{{- if eq .ignite.git_host "gitlab" }}
+[credential "{{ .ignite.gitlab_url }}"]
+	helper =
+	helper = !glab auth git-credential
+{{- end }}
+# Commits to the ignite repo itself use the GitHub noreply address.
+[includeIf "gitdir:~/.local/share/chezmoi/"]
+	path = ~/.config/git/ignite-identity
+[include]
+	path = ~/.gitconfig.local

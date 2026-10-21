@@ -1,0 +1,42 @@
+{{- $selected := includeTemplate "selected.json" . | fromJson -}}
+{{- $items := list -}}
+{{- range $name, $entry := $selected -}}
+{{-   if eq $entry.method "vscode_ext" }}{{ $items = append $items $entry.vscode_ext }}{{ end -}}
+{{- end -}}
+{{- if and (ne .ignite.os "windows") $items -}}
+#!/bin/bash
+# VS Code extensions from the ignite catalog.
+set -uo pipefail
+{{ template "lib.sh" . }}
+ig_path_setup
+ig_reset vscode-ext
+
+extensions=(
+{{- range $id := $items }}
+  {{ $id }}
+{{- end }}
+)
+
+ig_code=$(command -v code || true)
+if [ -z "$ig_code" ]; then
+  # IG_CODE_SEARCH overrides where to look (tests set it to nothing).
+  read -r -a candidates <<< "${IG_CODE_SEARCH-/opt/homebrew/bin/code /usr/local/bin/code $HOME/.local/bin/code}"
+  for candidate in ${candidates[@]+"${candidates[@]}"}; do
+    if [ -x "$candidate" ]; then
+      ig_code=$candidate
+      break
+    fi
+  done
+fi
+
+if [ -z "$ig_code" ]; then
+  for ext in "${extensions[@]}"; do
+    ig_report vscode-ext failed "$ext" "VS Code CLI not found"
+  done
+  exit 0
+fi
+
+for ext in "${extensions[@]}"; do
+  ig_try vscode-ext "$ext" ig_retry 2 "$ig_code" --install-extension "$ext"
+done
+{{ end -}}

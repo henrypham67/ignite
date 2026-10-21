@@ -1,0 +1,15 @@
+{{- /*
+  Git-hosted extras (oh-my-zsh, zsh plugins, themes) from the catalog's
+  `archive` entries. Tarballs, not git clones, so a Mac without Xcode's
+  command line tools (no git) still gets them.
+*/ -}}
+{{- $selected := includeTemplate "selected.json" . | fromJson -}}
+{{- range $name, $entry := $selected }}
+{{-   if eq $entry.method "archive" }}
+[{{ $entry.archive.dest | quote }}]
+    type = "archive"
+    url = {{ $entry.archive.url | quote }}
+    stripComponents = 1
+    refreshPeriod = "168h"
+{{   end }}
+{{- end }}
