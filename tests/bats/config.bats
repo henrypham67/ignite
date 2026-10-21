@@ -12,7 +12,7 @@ setup() {
 # Answers for every prompt except the ones a test sets itself.
 base_answers=(
   --promptString "Work email for git=ci@example.com"
-  --promptChoice "Company git host=github"
+  --promptChoice "Company git host: github.com or a self-hosted GitLab=github"
   --promptBool "Use AWS=true"
   --promptBool "Use Azure=false"
   --promptBool "Use GCP=false"
@@ -20,11 +20,6 @@ base_answers=(
   --promptBool "Install specialist tools=false"
   --promptBool "Install personal apps=false"
 )
-
-# value_of <toml> <key>: value of the first "key = value" line, unquoted.
-value_of() {
-  printf '%s\n' "$1" | sed -n "s/^[[:space:]]*$2[[:space:]]*=[[:space:]]*//p" | head -n 1 | tr -d "'\""
-}
 
 # choice_lines <toml>: "key = value" lines inside [data.ignite.choices].
 choice_lines() {
@@ -77,7 +72,7 @@ choice_lines() {
   [ "$(value_of "$output" gitlab_url)" = "" ]
 
   run --separate-stderr render_init "$TEMPLATE" "${base_answers[@]}" \
-    --promptChoice "Company git host=gitlab" \
+    --promptChoice "Company git host: github.com or a self-hosted GitLab=gitlab" \
     --promptString "Company GitLab URL=https://gitlab.example.com" \
     --promptBool "Change default tool choices=false"
   [ "$status" -eq 0 ]
@@ -119,6 +114,13 @@ choice_lines() {
     --promptChoice "Choice for editor=zed"
   [ "$status" -eq 0 ]
   [ "$(choice_lines "$output" | tr -d ' ')" = 'editor="zed"' ]
+}
+
+@test "config: IGNITE_CHOICE_MENU=1 prints the tool choices this machine can make" {
+  IGNITE_CHOICE_MENU=1 run --separate-stderr render_init "$TEMPLATE" "${base_answers[@]}" \
+    --promptBool "Change default tool choices=true"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$(printf 'editor\tvscode\tvscode zed\nprompt\tstarship\tpowerlevel10k starship')" ]
 }
 
 @test "config: choosing the default is not recorded as a customisation" {

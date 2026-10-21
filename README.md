@@ -16,7 +16,11 @@ Windows, from a normal (not elevated) PowerShell window:
 irm https://raw.githubusercontent.com/henrypham67/ignite/main/bootstrap.ps1 | iex
 ```
 
-It asks a few questions (work email, company git host, which clouds, whether Docker Desktop is licensed, optional tool groups), installs everything, then runs `ignite-doctor`. The doctor lists what's installed, what's missing, and what's left to do by hand: sign-ins, adding the SSH key, filling in secrets. On Windows it also prints the one-liner to run inside Ubuntu once WSL is up.
+It asks a few questions, installs everything, then runs `ignite-doctor`.
+
+Most questions are menus: move with the arrow keys, tick boxes with `x`, and press enter. The email and the GitLab URL are typed. The questions cover your work email, the company git host (github.com or a self-hosted GitLab, plus its URL), the clouds you use, whether the company licenses Docker Desktop (asked on macOS and Windows), two optional tool groups, and whether to change the default tools. Specialist tools include vault, istioctl, k6 and java; personal apps include Obsidian, ffmpeg and yt-dlp. The menus come from [gum](https://github.com/charmbracelet/gum), which the bootstrap installs with mise. If that fails, or there's no terminal to draw on, chezmoi asks the same questions as plain text. The questions only come up on the first run, and later runs reuse the answers.
+
+The doctor lists what's installed, what's missing, and what's left to do by hand: sign-ins, adding the SSH key, filling in secrets. On Windows it also prints the one-liner to run inside Ubuntu once WSL is up.
 
 Running it again is safe. It only adds or updates things, and never uninstalls. On the first run, any file it's about to replace (a `.zshrc` or `.gitconfig` from the company image, say) is copied to `~/.config/ignite/backup-<time>/` first. After that, chezmoi asks before overwriting a file you've changed.
 
@@ -35,6 +39,7 @@ Without admin, everything that can be installed per user still gets installed. C
 | `IGNITE_CA_CERT` | Path to the company root CA, for laptops behind a TLS-inspecting proxy. It's trusted before anything downloads, and curl, git, Python, Node and the AWS CLI are pointed at it. |
 | `IGNITE_NO_ADMIN=1` | Take the no-admin path even when sudo or UAC would work. |
 | `IGNITE_SKIP` | Comma-separated catalog entries to leave out, e.g. `docker-desktop,multipass`. |
+| `IGNITE_NO_GUM=1` | Ask the setup questions as plain text instead of gum menus. |
 | `GITHUB_TOKEN` | Used by mise when resolving tool versions. Set it if installs fail with a GitHub rate limit. |
 | `IGNITE_REPO`, `IGNITE_REF` | Install from a fork or a branch. |
 
