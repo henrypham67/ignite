@@ -4,6 +4,9 @@
 # Versioned CLIs and runtimes from the ignite catalog, installed per user by mise.
 {{ template "lib.ps1" . }}
 Update-IgnitePath
+# ignite's profile activates mise only in PowerShell 7; Windows PowerShell 5.1,
+# cmd and editors find mise tools through the shims.
+Add-IgniteUserPath -Dir (Join-Path $env:LOCALAPPDATA 'mise\shims')
 Reset-IgniteReport -Source mise
 $env:MISE_YES = '1'
 

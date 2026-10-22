@@ -109,3 +109,14 @@ function Update-IgnitePath {
     ) + $rest | Where-Object { $_ }
     $env:Path = $parts -join [IO.Path]::PathSeparator
 }
+
+# Put a dir first on the saved per-user PATH, once, so shells opened later find
+# it too. Update-IgnitePath covers the running script.
+function Add-IgniteUserPath {
+    param([Parameter(Mandatory)][string]$Dir)
+    $user = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $parts = @("$user" -split ';' | Where-Object { $_ })
+    if ($parts -notcontains $Dir) {
+        [Environment]::SetEnvironmentVariable('Path', (@($Dir) + $parts) -join ';', 'User')
+    }
+}

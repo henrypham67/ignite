@@ -46,6 +46,11 @@ is_empty() {
   ! grep -qx awscli <<< "$items"
 }
 
+@test "windows: mise script saves the shims dir on the user PATH" {
+  script=$(render_script windows-admin run_onchange_after_20-mise.ps1.tmpl)
+  grep -qxF "Add-IgniteUserPath -Dir (Join-Path \$env:LOCALAPPDATA 'mise\\shims')" "$script"
+}
+
 @test "windows: krew installs itself as a kubectl plugin before the plugins" {
   script=$(render_script windows-admin run_onchange_after_50-krew.ps1.tmpl)
   self=$(grep -n 'krew install krew' "$script" | head -n 1 | cut -d: -f1)
