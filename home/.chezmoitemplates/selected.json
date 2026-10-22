@@ -16,6 +16,7 @@
       "cloud-aws" .ignite.cloud_aws
       "cloud-azure" .ignite.cloud_azure
       "cloud-gcp" .ignite.cloud_gcp
+      "github" (eq .ignite.git_host "github")
       "gitlab" (eq .ignite.git_host "gitlab")
       "specialist" .ignite.group_specialist
       "personal" .ignite.group_personal -}}

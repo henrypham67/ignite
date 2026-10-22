@@ -80,9 +80,12 @@ fixture_with_choice() {
 }
 
 @test "zshrc: gh and glab completions ask for the shell with -s" {
-  run zshrc linux-admin
+  run zshrc darwin-admin
   grep -q "_lazy_completion gh 'gh completion -s zsh'" <<< "$output"
+  ! grep -q '_lazy_completion glab' <<< "$output"
+  run zshrc linux-admin
   grep -q "_lazy_completion glab 'glab completion -s zsh'" <<< "$output"
+  ! grep -q '_lazy_completion gh ' <<< "$output"
 }
 
 @test "zshrc: oh-my-zsh self-update is off (chezmoi updates it)" {

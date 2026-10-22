@@ -146,9 +146,11 @@ steps=""
 step() {
   steps="$steps  [ ] $*"$'\n'
 }
+{{- if eq .ignite.git_host "github" }}
 if command -v gh >/dev/null 2>&1 && ! gh auth status >/dev/null 2>&1; then
   step "Sign in to GitHub: gh auth login"
 fi
+{{- end }}
 {{- if eq .ignite.git_host "gitlab" }}
 {{-   $host := .ignite.gitlab_url | trimPrefix "https://" | trimPrefix "http://" | trimSuffix "/" }}
 if command -v glab >/dev/null 2>&1 && ! glab auth status --hostname {{ $host | squote }} >/dev/null 2>&1; then
@@ -171,7 +173,7 @@ if command -v gcloud >/dev/null 2>&1 && [ -z "$(gcloud auth list --format='value
 fi
 {{- end }}
 if [ -f "$HOME/.ssh/id_ed25519.pub" ]; then
-  step "Add this laptop's SSH key at https://github.com/settings/ssh/new{{ if eq .ignite.git_host "gitlab" }} and {{ .ignite.gitlab_url | trimSuffix "/" }}/-/user_settings/ssh_keys{{ end }}:"
+  step "Add this laptop's SSH key at {{ if eq .ignite.git_host "gitlab" }}{{ .ignite.gitlab_url | trimSuffix "/" }}/-/user_settings/ssh_keys{{ else }}https://github.com/settings/ssh/new{{ end }}:"
   steps="$steps      $(cat "$HOME/.ssh/id_ed25519.pub")"$'\n'
   if ssh-keygen -y -P "" -f "$HOME/.ssh/id_ed25519" >/dev/null 2>&1; then
     step "Optional: give the key a passphrase: ssh-keygen -p -f ~/.ssh/id_ed25519"

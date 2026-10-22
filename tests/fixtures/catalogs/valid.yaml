@@ -96,6 +96,10 @@ packages:
     platforms: [darwin, linux, wsl]
     brew: tree
     apt: tree
+  gh:
+    job: github_cli
+    group: github
+    mise: github-cli
   glab:
     job: gitlab_cli
     group: gitlab
