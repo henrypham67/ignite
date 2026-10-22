@@ -32,6 +32,13 @@ if ($LASTEXITCODE -ne 0) { throw 'chezmoi verify found differences' }
 $changes = & $chezmoi @common status --exclude=scripts
 if ($changes) { throw "a second apply still has changes:`n$($changes -join "`n")" }
 
+# Shells without ignite's profile (Windows PowerShell 5.1, cmd) find mise
+# tools only through the shims on the saved user PATH.
+$shims = Join-Path $env:LOCALAPPDATA 'mise\shims'
+if (([Environment]::GetEnvironmentVariable('Path', 'User') -split ';') -notcontains $shims) {
+    throw "$shims is not on the user PATH"
+}
+
 if ($env:IGNITE_NO_ADMIN -eq '1') {
     $report = Join-Path $env:LOCALAPPDATA 'ignite\report.tsv'
     $rows = @(Get-Content -LiteralPath $report | ForEach-Object { , ($_ -split "`t") })

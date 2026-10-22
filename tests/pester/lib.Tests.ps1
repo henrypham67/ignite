@@ -82,6 +82,24 @@ Describe 'lib.ps1' {
         finally { $env:Path = $saved }
     }
 
+    It 'Add-IgniteUserPath puts the dir first on the saved user PATH, once' {
+        if (-not $IsWindows) { Set-ItResult -Skipped -Because 'the user PATH lives in the Windows registry' }
+        $savedUser = [Environment]::GetEnvironmentVariable('Path', 'User')
+        $saved = $env:Path
+        $dir = Join-Path $TestDrive 'shims'
+        try {
+            Add-IgniteUserPath -Dir $dir
+            Add-IgniteUserPath -Dir $dir
+            $parts = [Environment]::GetEnvironmentVariable('Path', 'User') -split ';'
+            $parts[0] | Should -Be $dir
+            @($parts | Where-Object { $_ -eq $dir }).Count | Should -Be 1
+        }
+        finally {
+            [Environment]::SetEnvironmentVariable('Path', $savedUser, 'User')
+            $env:Path = $saved
+        }
+    }
+
     It 'detail strips tabs and newlines' {
         Add-IgniteReport -Source scoop -Status failed -Item git -Detail "a`tb`nc"
         $lines = @(Get-Content -LiteralPath $Report)
