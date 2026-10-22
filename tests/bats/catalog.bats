@@ -40,6 +40,7 @@ method() {
   [ "$(method colima)" != absent ]
   [ "$(method docker-cli)" != absent ]
   [ "$(method awscli)" != absent ]
+  [ "$(method gh)" = mise ]
   [ "$(method glab)" = absent ]
   [ "$(method cilium-cli)" = absent ]
   [ "$(method rectangle)" = cask ]
@@ -109,6 +110,7 @@ method() {
 @test "catalog: linux-admin" {
   select_for linux-admin
   [ "$(method glab)" != absent ]
+  [ "$(method gh)" = absent ]
   [ "$(method docker-engine)" = script ]
   [ "$(method hack-nerd-font)" = script ]
   [ "$(method vscode)" = script ]

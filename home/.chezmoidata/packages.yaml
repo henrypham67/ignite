@@ -2,7 +2,7 @@
 # catalog check (`mise run validate`) fails if two default entries share a job.
 #
 #   job        what it is for (snake_case)
-#   group      core | cloud-aws | cloud-azure | cloud-gcp | gitlab | specialist | personal
+#   group      core | cloud-aws | cloud-azure | cloud-gcp | github | gitlab | specialist | personal
 #   option     instead of group: picked when choice_defaults/[data.ignite.choices] says so
 #   platforms  default [darwin, windows, linux, wsl]
 #   sources    mise (+ mise_skip), brew, cask, user_app, winget (+ winget_user), scoop, apt,
@@ -347,7 +347,7 @@ packages:
     mise: pre-commit
   gh:
     job: github_cli
-    group: core
+    group: github
     mise: github-cli
     completion: cobra
     completion_flag: "-s"   # `gh completion zsh` prints bash; it wants `-s zsh`

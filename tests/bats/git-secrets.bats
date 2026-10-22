@@ -36,6 +36,7 @@ get() {
 @test "gitconfig: glab helper and gitlab url on linux-admin" {
   gitconfig linux-admin
   [ "$(get credential.https://gitlab.example.com.helper | tail -n 1)" = "!glab auth git-credential" ]
+  ! grep -q 'gh auth' "$GITCONFIG"
 }
 
 @test "gitconfig: includeIf points at noreply identity" {

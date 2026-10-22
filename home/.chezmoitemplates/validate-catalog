@@ -10,7 +10,7 @@
   V5 an install source on every platform of a package entry
 */ -}}
 {{- $errs := list -}}
-{{- $groups := list "core" "cloud-aws" "cloud-azure" "cloud-gcp" "gitlab" "specialist" "personal" -}}
+{{- $groups := list "core" "cloud-aws" "cloud-azure" "cloud-gcp" "github" "gitlab" "specialist" "personal" -}}
 {{- $allPlatforms := list "darwin" "windows" "linux" "wsl" -}}
 {{- $packageSources := list "mise" "brew" "cask" "user_app" "winget" "scoop" "apt" "script" "bootstrap" -}}
 {{- $sourcesFor := dict

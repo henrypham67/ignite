@@ -203,10 +203,12 @@ problems() {
   with_catalog "$FIXTURES/catalogs/valid.yaml"
   select_for linux-admin
   [ "$(method glab)" = mise ]
+  [ "$(method gh)" = absent ]
   [ "$(method awscli)" = absent ]
   [ "$(method cilium-cli)" = absent ]
   select_for darwin-admin
   [ "$(method glab)" = absent ]
+  [ "$(method gh)" = mise ]
   [ "$(method awscli)" = mise ]
   select_for darwin-custom
   [ "$(method cilium-cli)" = mise ]

@@ -165,6 +165,27 @@ doctor() {
   [[ "$output" == *"glab auth login --hostname gitlab.example.com"* ]]
 }
 
+@test "doctor: gitlab machines skip gh login and the GitHub key page" {
+  install_everything linux-admin
+  stub glab 'exit 0'
+  stub gh 'exit 1'
+  doctor
+  [[ "$output" != *"gh auth login"* ]]
+  [[ "$output" != *"github.com/settings/ssh"* ]]
+}
+
+@test "doctor.ps1: gh login and the GitHub key page only on github machines" {
+  run render_file windows-admin "$REPO/home/dot_local/bin/ignite-doctor.ps1.tmpl"
+  [[ "$output" == *"gh auth login"* ]]
+  [[ "$output" == *"https://github.com/settings/ssh/new"* ]]
+  run render_file linux-admin "$REPO/home/dot_local/bin/ignite-doctor.ps1.tmpl"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"glab auth login --hostname gitlab.example.com"* ]]
+  [[ "$output" == *"https://gitlab.example.com/-/user_settings/ssh_keys"* ]]
+  [[ "$output" != *"gh auth"* ]]
+  [[ "$output" != *"github.com/settings/ssh"* ]]
+}
+
 @test "doctor: sign-in steps appear when not signed in" {
   install_everything darwin-admin
   stub gh 'exit 1'

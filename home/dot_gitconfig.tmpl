@@ -16,12 +16,14 @@
 	sslCAInfo = {{ .ignite.ca_bundle }}
 {{-   end }}
 {{- end }}
+{{- if eq .ignite.git_host "github" }}
 [credential "https://github.com"]
 	helper =
 	helper = !gh auth git-credential
 [credential "https://gist.github.com"]
 	helper =
 	helper = !gh auth git-credential
+{{- end }}
 {{- if eq .ignite.git_host "gitlab" }}
 [credential "{{ .ignite.gitlab_url }}"]
 	helper =

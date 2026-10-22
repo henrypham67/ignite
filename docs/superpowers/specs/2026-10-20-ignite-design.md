@@ -112,7 +112,7 @@ Admin rights vary between company laptops, and sometimes there are none. The boo
 ### Per-machine questions (asked once at init, stored locally, never committed)
 
 - Work email, used for git `user.email`
-- Company git host: GitHub, or GitLab plus its URL. This decides whether `gh` or `glab` gets configured as the credential helper.
+- Company git host: GitHub, or GitLab plus its URL. This decides whether `gh` or `glab` gets installed and configured as the credential helper. A laptop gets one of the two, never both.
 - Cloud(s) used: AWS / Azure / GCP. Each turns on its CLI group (AWS → `awscli`, `eksctl`, the AWS VS Code extension; Azure → `az`, `kubelogin`; GCP → `gcloud`).
 - Container engine; see below.
 - **Alternatives are chosen per job, and choosing one replaces the default.** For example, `editor: vscode | zed` or `prompt: starship | powerlevel10k`. There is no "turn on all alternatives" switch, because that would install two tools for one job.
@@ -131,7 +131,7 @@ Docker Desktop needs a paid license at larger companies, so this is a per-laptop
 
 Every tool appears **once** in a single catalog, `home/.chezmoidata/packages.yaml`. Each entry records:
 - the **job** it does, which is how duplicates get prevented
-- its **group**: `core`, `cloud-aws`, `cloud-azure`, `cloud-gcp`, `specialist`, `alt`, or `personal`
+- its **group**: `core`, `cloud-aws`, `cloud-azure`, `cloud-gcp`, `github`, `gitlab`, `specialist`, `alt`, or `personal`
 - **where to install it from on each OS**
 
 Templates turn the catalog into the per-OS install lists:
@@ -196,9 +196,11 @@ A command on every system (`ignite-doctor` for sh, `ignite-doctor.ps1` for Power
 
 ## Appendix: starting inventory (from the owner's current Mac, 2026-10-20)
 
-**core**: kubectl, helm, k9s, kustomize, kubeconform, kind, argocd, flux, terraform, tflint, terraform-docs, ansible, pre-commit, gh, glab, git, jq, yq, direnv, zoxide, ripgrep, bat, tree, wget, curl, uv, python, go, node, neovim, tmux, Starship, mise, Claude Code. krew plugins: ctx, ns, neat, view-secret.
+**core**: kubectl, helm, k9s, kustomize, kubeconform, kind, argocd, flux, terraform, tflint, terraform-docs, ansible, pre-commit, git, jq, yq, direnv, zoxide, ripgrep, bat, tree, wget, curl, uv, python, go, node, neovim, tmux, Starship, mise, Claude Code. krew plugins: ctx, ns, neat, view-secret.
 
 **cloud-aws**: awscli, eksctl. **cloud-azure**: az, kubelogin. **cloud-gcp**: gcloud.
+
+**github** (company git host is GitHub): gh. **gitlab** (company git host is GitLab): glab.
 
 **specialist** (off): cilium-cli, istioctl, clusterctl, clusterawsadm, kops, vault, teleport (tsh), k6, libpq (psql), mkcert, krew `cnpg`, Java toolchain (openjdk, maven, gradle, coursier).
 

@@ -94,9 +94,11 @@ function Test-IgniteOutput {
 
 function Get-IgniteManualStep {
     $steps = @()
+{{- if eq .ignite.git_host "github" }}
     if (-not (Test-IgniteSucceed -Command gh -ScriptBlock { gh auth status })) {
         $steps += 'Sign in to GitHub: gh auth login'
     }
+{{- end }}
 {{- if eq .ignite.git_host "gitlab" }}
 {{-   $host := .ignite.gitlab_url | trimPrefix "https://" | trimPrefix "http://" | trimSuffix "/" }}
     if (-not (Test-IgniteSucceed -Command glab -ScriptBlock { glab auth status --hostname '{{ $host }}' })) {
@@ -120,7 +122,7 @@ function Get-IgniteManualStep {
 {{- end }}
     $pub = Join-Path $HOME '.ssh/id_ed25519.pub'
     if (Test-Path -LiteralPath $pub) {
-        $steps += "Add this laptop's SSH key at https://github.com/settings/ssh/new{{ if eq .ignite.git_host "gitlab" }} and {{ .ignite.gitlab_url | trimSuffix "/" }}/-/user_settings/ssh_keys{{ end }}:"
+        $steps += "Add this laptop's SSH key at {{ if eq .ignite.git_host "gitlab" }}{{ .ignite.gitlab_url | trimSuffix "/" }}/-/user_settings/ssh_keys{{ else }}https://github.com/settings/ssh/new{{ end }}:"
         $steps += "    $(Get-Content -Raw -LiteralPath $pub)".TrimEnd()
         $steps += 'Optional: give the key a passphrase: ssh-keygen -p -f ~/.ssh/id_ed25519'
     }
