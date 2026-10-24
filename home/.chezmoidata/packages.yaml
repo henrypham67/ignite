@@ -565,6 +565,16 @@ packages:
     platforms: [darwin]
     brew: teleport
     bin: tsh
+  teleport-connect:
+    job: access_teleport_app
+    group: specialist
+    platforms: [darwin, windows]
+    cask: teleport-connect
+    winget: Gravitational.TeleportConnect
+    admin_only: true   # the winget package is machine-wide only
+    check_path:
+      darwin: Applications/Teleport Connect.app
+      windows: C:/Program Files/Teleport Connect/Teleport Connect.exe
   k6:
     job: load_testing
     group: specialist
